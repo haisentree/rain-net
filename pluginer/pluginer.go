@@ -14,16 +14,27 @@ var (
 	serverTypes = make(map[string]ServerType)
 	// 插件
 	plugins = make(map[string]map[string]Plugin)
+
+	// 进程退出时执行的函数列表
+	OnProcessExit []func()
+
+	// instances is the list of running Instances.
+	instances []*Instance
+
+	// instancesMu protects instances.
+	instancesMu sync.Mutex
 )
 
 func Start() (*Instance, error) {
 	inst := &Instance{serverType: "custom", wg: new(sync.WaitGroup), Storage: make(map[interface{}]interface{})}
 
+	// startWithListenerFds
 	serverList, err := makeServers()
 	if err != nil {
 		return nil, err
 	}
 
+	// OnFirstStartup
 	err = startServers(serverList, inst)
 	if err != nil {
 		return nil, err
@@ -42,6 +53,7 @@ func makeServers() ([]Server, error) {
 	return serverList, nil
 }
 
+// 默认固定启动TCP和UDP服务器
 func startServers(serverList []Server, inst *Instance) error {
 	errChan := make(chan error, len(serverList))
 	stopChan := make(chan struct{})
@@ -52,6 +64,7 @@ func startServers(serverList []Server, inst *Instance) error {
 		pc  net.PacketConn
 		err error
 	)
+
 	for _, s := range serverList {
 		if ln == nil {
 			ln, err = s.Listen()

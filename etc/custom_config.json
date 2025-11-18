@@ -1,0 +1,9 @@
+{
+  "server": [
+    {
+      "server_type": "custom",
+      "addr": ":20000",
+      "plugin": []
+    }
+  ]
+}

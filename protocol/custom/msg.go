@@ -11,3 +11,7 @@ type Msg struct {
 	MsgHdr
 	body string
 }
+
+type ResponseWriter interface {
+	Write([]byte) (int, error)
+}
