@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	customP "rain-net/internal/custom"
+	customserver "rain-net/internal/custom/server"
 	"strings"
 	"sync"
 )
@@ -45,7 +45,7 @@ func Start() (*Instance, error) {
 
 func makeServers() ([]Server, error) {
 	var serverList []Server
-	server, err := customP.NewServer("")
+	server, err := customserver.NewServer("")
 	if err != nil {
 		panic("make Server err")
 	}
