@@ -1,0 +1,7 @@
+Config:
+  - server: test-1
+    host:
+     - type: tcp
+       address: 0.0.0.0:8080
+     - type: udp
+       address: 0.0.0.0:8081

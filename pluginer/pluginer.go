@@ -29,33 +29,39 @@ func Start() (*Instance, error) {
 	inst := &Instance{serverType: "custom", wg: new(sync.WaitGroup), Storage: make(map[interface{}]interface{})}
 
 	// startWithListenerFds
-	serverList, err := makeServers()
+	tcpServerList, udpServerList, err := makeServers()
 	if err != nil {
 		return nil, err
 	}
 
 	// OnFirstStartup
-	err = startServers(serverList, inst)
+	err = startServers(tcpServerList, udpServerList, inst)
 	if err != nil {
 		return nil, err
 	}
 
+	inst.Wait()
+
 	return inst, nil
 }
 
-func makeServers() ([]Server, error) {
-	var serverList []Server
+func makeServers() ([]TCPServer, []UDPServer, error) {
+	var tcpServerList []TCPServer
+	var udpServerList []UDPServer
+
 	server, err := customserver.NewServer("")
 	if err != nil {
 		panic("make Server err")
 	}
-	serverList = append(serverList, server)
-	return serverList, nil
+	tcpServerList = append(tcpServerList, server)
+	udpServerList = append(udpServerList, server)
+
+	return tcpServerList, udpServerList, nil
 }
 
-// 默认固定启动TCP和UDP服务器
-func startServers(serverList []Server, inst *Instance) error {
-	errChan := make(chan error, len(serverList))
+// 启动TCP和UDP服务器
+func startServers(tcpServerList []TCPServer, udpServerList []UDPServer, inst *Instance) error {
+	errChan := make(chan error, len(tcpServerList)+len(udpServerList))
 	stopChan := make(chan struct{})
 	stopWg := &sync.WaitGroup{}
 
@@ -65,26 +71,30 @@ func startServers(serverList []Server, inst *Instance) error {
 		err error
 	)
 
-	for _, s := range serverList {
+	for _, s := range tcpServerList {
 		if ln == nil {
 			ln, err = s.Listen()
 			if err != nil {
 				return fmt.Errorf("Listen: %v", err)
 			}
 		}
+		inst.tcpServers = append(inst.tcpServers, TCPServerListener{server: s, listener: ln})
+	}
+
+	for _, s := range udpServerList {
 		if pc == nil {
 			pc, err = s.ListenPacket()
 			if err != nil {
 				return fmt.Errorf("ListenPacket: %v", err)
 			}
 		}
-		inst.servers = append(inst.servers, ServerListener{server: s, listener: ln, packet: pc})
+		inst.udpServers = append(inst.udpServers, UDPServerListener{server: s, packet: pc})
 	}
 
-	for _, s := range inst.servers {
-		inst.wg.Add(2)
-		stopWg.Add(2)
-		func(s Server, ln net.Listener, pc net.PacketConn, inst *Instance) {
+	for _, s := range inst.tcpServers {
+		inst.wg.Add(1)
+		stopWg.Add(1)
+		func(s TCPServer, ln net.Listener, inst *Instance) {
 			go func() {
 				defer func() {
 					inst.wg.Done()
@@ -92,7 +102,13 @@ func startServers(serverList []Server, inst *Instance) error {
 				}()
 				errChan <- s.Serve(ln)
 			}()
+		}(s.server, s.listener, inst)
+	}
 
+	for _, s := range inst.udpServers {
+		inst.wg.Add(1)
+		stopWg.Add(1)
+		func(s UDPServer, pc net.PacketConn, inst *Instance) {
 			go func() {
 				defer func() {
 					inst.wg.Done()
@@ -100,7 +116,7 @@ func startServers(serverList []Server, inst *Instance) error {
 				}()
 				errChan <- s.ServePacket(pc)
 			}()
-		}(s.server, s.listener, s.packet, inst)
+		}(s.server, s.packet, inst)
 	}
 
 	go func() {

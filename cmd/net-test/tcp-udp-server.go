@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	port := ":20000"
+	port := ":9999"
 	var wg sync.WaitGroup
 
 	// 启动 TCP 服务器

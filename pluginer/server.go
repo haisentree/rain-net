@@ -13,11 +13,6 @@ func RegisterServerType(typeName string, srv ServerType) {
 	serverTypes[typeName] = srv
 }
 
-type Server interface {
-	TCPServer
-	UDPServer
-}
-
 type TCPServer interface {
 	Listen() (net.Listener, error)
 	Serve(net.Listener) error
@@ -28,8 +23,12 @@ type UDPServer interface {
 	ServePacket(net.PacketConn) error
 }
 
-type ServerListener struct {
-	server   Server
+type TCPServerListener struct {
+	server   TCPServer
 	listener net.Listener
-	packet   net.PacketConn
+}
+
+type UDPServerListener struct {
+	server UDPServer
+	packet net.PacketConn
 }

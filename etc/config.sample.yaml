@@ -1,0 +1,10 @@
+service:
+  - name: test-1  # 服务名称
+    protocol: none # 协议,如果host为空且可匹配到协议,会自动创建host内容
+    host:           # networt选填tcp、tcp6、udp、udp6
+      - network: tcp 
+        address: 0.0.0.0:8080
+      - network: udp
+        address: 0.0.0.0:8081
+      - network: udp6
+        address: "[::]:8080"

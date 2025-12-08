@@ -8,7 +8,8 @@ type Instance struct {
 
 	wg *sync.WaitGroup
 
-	servers []ServerListener
+	tcpServers []TCPServerListener
+	udpServers []UDPServerListener
 
 	// these callbacks execute when certain events occur
 	OnFirstStartup  []func() error // starting, not as part of a restart
