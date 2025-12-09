@@ -1,4 +1,4 @@
-package custom
+package customserver
 
 import "rain-net/pluginer"
 

@@ -31,9 +31,6 @@ func Start() (*Instance, error) {
 		return inst, err
 	}
 
-	// 在Start()外面执行
-	inst.Wait()
-
 	return inst, nil
 }
 

@@ -46,3 +46,15 @@ type Input interface {
 	// The type of server this input is intended for
 	ServerType() string
 }
+
+type YAMLFileInput struct {
+	Filepath       string
+	Contents       []byte
+	ServerTypeName string
+}
+
+func (c YAMLFileInput) Body() []byte { return c.Contents }
+
+func (c YAMLFileInput) Path() string { return c.Filepath }
+
+func (c YAMLFileInput) ServerType() string { return c.ServerTypeName }
