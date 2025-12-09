@@ -1,5 +1,7 @@
 package pluginer
 
+// 舍弃
+
 type Controller struct {
 	instance *Instance
 }

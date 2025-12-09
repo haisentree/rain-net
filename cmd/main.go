@@ -1,16 +1,9 @@
 package main
 
 import (
-	"fmt"
-
-	"rain-net/pluginer"
+	"rain-net/cmd/custom"
 )
 
 func main() {
-	instance, err := pluginer.Start()
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	instance.Wait()
+	custom.Run()
 }

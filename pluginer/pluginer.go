@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	customserver "rain-net/internal/custom/server"
 	"strings"
 	"sync"
 )
@@ -27,41 +26,34 @@ var (
 
 func Start() (*Instance, error) {
 	inst := &Instance{serverType: "custom", wg: new(sync.WaitGroup), Storage: make(map[interface{}]interface{})}
-
-	// startWithListenerFds
-	tcpServerList, udpServerList, err := makeServers()
+	err := startWithListenerFds(inst)
 	if err != nil {
-		return nil, err
+		return inst, err
 	}
 
-	// OnFirstStartup
-	err = startServers(tcpServerList, udpServerList, inst)
-	if err != nil {
-		return nil, err
-	}
-
+	// 在Start()外面执行
 	inst.Wait()
 
 	return inst, nil
 }
 
-func makeServers() ([]TCPServer, []UDPServer, error) {
-	var tcpServerList []TCPServer
-	var udpServerList []UDPServer
-
-	server, err := customserver.NewServer("")
+func startWithListenerFds(inst *Instance) error {
+	serverList, err := inst.context.MakeServers()
 	if err != nil {
-		panic("make Server err")
+		return err
 	}
-	tcpServerList = append(tcpServerList, server)
-	udpServerList = append(udpServerList, server)
 
-	return tcpServerList, udpServerList, nil
+	err = startServers(serverList, inst)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // 启动TCP和UDP服务器
-func startServers(tcpServerList []TCPServer, udpServerList []UDPServer, inst *Instance) error {
-	errChan := make(chan error, len(tcpServerList)+len(udpServerList))
+func startServers(serverList []Server, inst *Instance) error {
+	errChan := make(chan error, len(serverList))
 	stopChan := make(chan struct{})
 	stopWg := &sync.WaitGroup{}
 
@@ -71,30 +63,26 @@ func startServers(tcpServerList []TCPServer, udpServerList []UDPServer, inst *In
 		err error
 	)
 
-	for _, s := range tcpServerList {
+	for _, s := range serverList {
 		if ln == nil {
 			ln, err = s.Listen()
 			if err != nil {
 				return fmt.Errorf("Listen: %v", err)
 			}
 		}
-		inst.tcpServers = append(inst.tcpServers, TCPServerListener{server: s, listener: ln})
-	}
-
-	for _, s := range udpServerList {
 		if pc == nil {
 			pc, err = s.ListenPacket()
 			if err != nil {
 				return fmt.Errorf("ListenPacket: %v", err)
 			}
 		}
-		inst.udpServers = append(inst.udpServers, UDPServerListener{server: s, packet: pc})
+		inst.servers = append(inst.servers, ServerListener{server: s, listener: ln, packet: pc})
 	}
 
-	for _, s := range inst.tcpServers {
-		inst.wg.Add(1)
-		stopWg.Add(1)
-		func(s TCPServer, ln net.Listener, inst *Instance) {
+	for _, s := range inst.servers {
+		inst.wg.Add(2)
+		stopWg.Add(2)
+		func(s Server, ln net.Listener, pc net.PacketConn, inst *Instance) {
 			go func() {
 				defer func() {
 					inst.wg.Done()
@@ -102,13 +90,7 @@ func startServers(tcpServerList []TCPServer, udpServerList []UDPServer, inst *In
 				}()
 				errChan <- s.Serve(ln)
 			}()
-		}(s.server, s.listener, inst)
-	}
 
-	for _, s := range inst.udpServers {
-		inst.wg.Add(1)
-		stopWg.Add(1)
-		func(s UDPServer, pc net.PacketConn, inst *Instance) {
 			go func() {
 				defer func() {
 					inst.wg.Done()
@@ -116,7 +98,7 @@ func startServers(tcpServerList []TCPServer, udpServerList []UDPServer, inst *In
 				}()
 				errChan <- s.ServePacket(pc)
 			}()
-		}(s.server, s.packet, inst)
+		}(s.server, s.listener, s.packet, inst)
 	}
 
 	go func() {

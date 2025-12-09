@@ -1,9 +1,9 @@
-package main
+package custom
 
 import "rain-net/pluginer"
 
-func main() {
-	pluginer.TrapSignalsCrossPlatform()
+func Run() {
+	// pluginer.TrapSignalsCrossPlatform()
 
 	inst, err := pluginer.Start()
 	if err != nil {

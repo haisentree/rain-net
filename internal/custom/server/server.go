@@ -80,4 +80,4 @@ func (s *Server) ListenPacket() (net.PacketConn, error) {
 	return p, nil
 }
 
-func (s *Server) Address() string { return s.Addr }
+func (s *Server)     () string { return s.Addr }

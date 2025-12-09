@@ -8,8 +8,7 @@ type Instance struct {
 
 	wg *sync.WaitGroup
 
-	tcpServers []TCPServerListener
-	udpServers []UDPServerListener
+	servers []ServerListener
 
 	// these callbacks execute when certain events occur
 	OnFirstStartup  []func() error // starting, not as part of a restart
@@ -19,6 +18,8 @@ type Instance struct {
 	OnShutdown      []func() error // stopping, even as part of a restart
 	OnFinalShutdown []func() error // stopping, not as part of a restart
 
+	// 不同的协议对应配置项不同,配置应该放在对应协议的context中
+	context   Context
 	Storage   map[interface{}]interface{}
 	StorageMu sync.RWMutex
 }
@@ -42,4 +43,8 @@ func (i *Instance) ShutdownCallbacks() []error {
 		}
 	}
 	return errs
+}
+
+type Context interface {
+	MakeServers() ([]Server, error)
 }

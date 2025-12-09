@@ -3,7 +3,9 @@ package pluginer
 import "net"
 
 type ServerType struct {
-	Directives func() []string // 支持的插件名称
+	Directives   func() []string              // 支持的插件名称
+	DefaultInput func() Input                 // 配置输入
+	NewContext   func(inst *Instance) Context // 协议特有配置可方法
 }
 
 func RegisterServerType(typeName string, srv ServerType) {
@@ -11,6 +13,11 @@ func RegisterServerType(typeName string, srv ServerType) {
 		panic("server type already registered")
 	}
 	serverTypes[typeName] = srv
+}
+
+type Server interface {
+	TCPServer
+	UDPServer
 }
 
 type TCPServer interface {
@@ -23,12 +30,19 @@ type UDPServer interface {
 	ServePacket(net.PacketConn) error
 }
 
-type TCPServerListener struct {
-	server   TCPServer
+type ServerListener struct {
+	server   Server
 	listener net.Listener
+	packet   net.PacketConn
 }
 
-type UDPServerListener struct {
-	server UDPServer
-	packet net.PacketConn
+type Input interface {
+	// Gets the Caddyfile contents
+	Body() []byte
+
+	// Gets the path to the origin file
+	Path() string
+
+	// The type of server this input is intended for
+	ServerType() string
 }
