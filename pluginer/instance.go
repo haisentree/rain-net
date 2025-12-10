@@ -18,9 +18,7 @@ type Instance struct {
 	OnShutdown      []func() error // stopping, even as part of a restart
 	OnFinalShutdown []func() error // stopping, not as part of a restart
 
-	// 不同的协议对应配置项不同,配置应该放在对应协议的context中
-	context   Context
-	Storage   map[interface{}]interface{}
+	context   Context // 协议特定的配置项等
 	StorageMu sync.RWMutex
 }
 

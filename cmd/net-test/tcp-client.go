@@ -10,7 +10,7 @@ import (
 
 func main() {
 	//开始拨号
-	conn, err := net.Dial("tcp", "127.0.0.1:9999")
+	conn, err := net.Dial("tcp", "127.0.0.1:8080")
 	if err != nil {
 		fmt.Println("err: ", err)
 		return

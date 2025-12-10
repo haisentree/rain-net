@@ -17,15 +17,17 @@ var (
 	// 进程退出时执行的函数列表
 	OnProcessExit []func()
 
-	// instances is the list of running Instances.
 	instances []*Instance
 
-	// instancesMu protects instances.
 	instancesMu sync.Mutex
 )
 
-func Start() (*Instance, error) {
-	inst := &Instance{serverType: "custom", wg: new(sync.WaitGroup), Storage: make(map[interface{}]interface{})}
+func Start(yamlfile Input) (*Instance, error) {
+	inst := &Instance{serverType: yamlfile.ServerType(), wg: new(sync.WaitGroup)}
+	if err := validateAndExecuteDirectives(yamlfile, inst); err != nil {
+		return nil, err
+	}
+
 	err := startWithListenerFds(inst)
 	if err != nil {
 		return inst, err
@@ -34,7 +36,22 @@ func Start() (*Instance, error) {
 	return inst, nil
 }
 
+func validateAndExecuteDirectives(yamlfile Input, inst *Instance) error {
+	stype, ok := serverTypes[yamlfile.ServerType()]
+	if !ok {
+		return fmt.Errorf("no server types plugged in")
+	}
+
+	inst.context = stype.NewContext(inst)
+
+	return nil
+}
+
 func startWithListenerFds(inst *Instance) error {
+	instancesMu.Lock()
+	instances = append(instances, inst)
+	instancesMu.Unlock()
+
 	serverList, err := inst.context.MakeServers()
 	if err != nil {
 		return err

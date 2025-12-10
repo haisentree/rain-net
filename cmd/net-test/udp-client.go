@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:9999")
+	udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:8081")
 	if err != nil {
 		fmt.Printf("UDP 地址解析错误: %v\n", err)
 		return

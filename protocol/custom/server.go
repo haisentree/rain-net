@@ -2,6 +2,7 @@ package custom
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -23,48 +24,23 @@ func (srv *Server) init() {
 func (srv *Server) ListenAndServe() error {
 
 	srv.init()
-
-	// switch srv.Net {
-	// case "tcp", "tcp4", "tcp6":
-	// 	l, err := listenTCP(srv.Net, addr, srv.ReusePort, srv.ReuseAddr)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	srv.Listener = l
-	// 	srv.started = true
-	// 	unlock()
-	// 	return srv.serveTCP(l)
-	// case "tcp-tls", "tcp4-tls", "tcp6-tls":
-	// 	if srv.TLSConfig == nil || (len(srv.TLSConfig.Certificates) == 0 && srv.TLSConfig.GetCertificate == nil) {
-	// 		return errors.New("neither Certificates nor GetCertificate set in config")
-	// 	}
-	// 	network := strings.TrimSuffix(srv.Net, "-tls")
-	// 	l, err := listenTCP(network, addr, srv.ReusePort, srv.ReuseAddr)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	l = tls.NewListener(l, srv.TLSConfig)
-	// 	srv.Listener = l
-	// 	srv.started = true
-	// 	unlock()
-	// 	return srv.serveTCP(l)
-	// case "udp", "udp4", "udp6":
-	// 	l, err := listenUDP(srv.Net, addr, srv.ReusePort, srv.ReuseAddr)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	u := l.(*net.UDPConn)
-	// 	if e := setUDPSocketOptions(u); e != nil {
-	// 		u.Close()
-	// 		return e
-	// 	}
-	// 	srv.PacketConn = l
-	// 	srv.started = true
-	// 	unlock()
-	// 	return srv.serveUDP(u)
-	// }
-	// return &Error{err: "bad network"}
-	return nil
+	switch srv.Net {
+	case "tcp", "tcp4", "tcp6":
+		l, err := net.Listen(srv.Net, srv.Addr)
+		if err != nil {
+			return err
+		}
+		srv.Listener = l
+		return srv.serveTCP(l)
+	case "udp", "udp4", "udp6":
+		l, err := net.ListenPacket(srv.Net, srv.Addr)
+		if err != nil {
+			return err
+		}
+		srv.PacketConn = l
+		return srv.serveUDP(l)
+	}
+	return errors.New("bad network")
 }
 
 func (srv *Server) ActivateAndServe() error {
@@ -108,7 +84,7 @@ func (srv *Server) serveUDP(l net.PacketConn) error {
 
 func (srv *Server) serveTCPConn(conn net.Conn) {
 	//延迟关闭连接
-	defer conn.Close()
+	// defer conn.Close()
 	for {
 		//阅读conn中的内容
 		//bufio.NewReader打开一个文件，并返回一个文件句柄

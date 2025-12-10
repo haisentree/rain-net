@@ -7,8 +7,9 @@ type Config struct {
 }
 
 type Service struct {
-	Name string `yaml:"name"`
-	Host []Host `yaml:"host"`
+	Name     string `yaml:"name"`
+	Protocol string `yaml:"protocol"`
+	Host     []Host `yaml:"host"`
 }
 
 type Host struct {

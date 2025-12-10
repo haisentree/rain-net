@@ -3,7 +3,10 @@ package customserver
 import (
 	"errors"
 	"fmt"
+	"os"
 	"rain-net/pluginer"
+
+	"gopkg.in/yaml.v3"
 )
 
 const serverType = "custom"
@@ -23,14 +26,29 @@ func newDirectives() []string {
 func newDefaultInput() pluginer.Input {
 	return pluginer.YAMLFileInput{
 		Filepath:       "/root/Project/DnsGit/rain-net/etc/custom.yaml",
-		Contents:       []byte("content"),
+		Contents:       []byte("default"),
 		ServerTypeName: serverType,
 	}
 }
 
 func newContext(i *pluginer.Instance) pluginer.Context {
-	return &customContext{}
+	data, err := os.ReadFile(newDefaultInput().Path())
+	if err != nil {
+		panic(err)
+	}
+
+	var config Config
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
+		panic(err)
+	}
+
+	return &customContext{
+		Configs: &config,
+	}
 }
+
+var _ pluginer.Context = &customContext{}
 
 type customContext struct {
 	Configs *Config
@@ -50,15 +68,31 @@ func (h *customContext) MakeServers() ([]pluginer.Server, error) {
 }
 
 func makeServersForGroup(srvList []Service) ([]pluginer.Server, error) {
+	var servers []pluginer.Server
+
 	for _, srv := range srvList {
+		if srv.Protocol != serverType {
+			continue
+		}
+
 		for _, host := range srv.Host {
 			switch host.Network {
 			case "tcp":
+				s, err := NewServer(srv.Name, host)
+				if err != nil {
+					fmt.Println("tcp NewServer err:", err.Error())
+				}
+				servers = append(servers, s)
 			case "udp":
+				s, err := NewServer(srv.Name, host)
+				if err != nil {
+					fmt.Println("udp NewServer err:", err.Error())
+				}
+				servers = append(servers, s)
 			default:
 				fmt.Println("error")
 			}
 		}
 	}
-	return nil, nil
+	return servers, nil
 }
