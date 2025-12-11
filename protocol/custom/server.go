@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+type Handler interface {
+	ServeCustom(w ResponseWriter, r *Msg)
+}
+
+type HandlerFunc func(ResponseWriter, *Msg)
+
 type Server struct {
 	Addr         string
 	Net          string
@@ -15,6 +21,8 @@ type Server struct {
 	PacketConn   net.PacketConn
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
+
+	Handler Handler
 }
 
 func (srv *Server) init() {
@@ -65,20 +73,12 @@ func (srv *Server) serveTCP(l net.Listener) error {
 	}
 }
 
-func (srv *Server) serveUDP(l net.PacketConn) error {
-	defer l.Close()
+func (srv *Server) serveUDP(p net.PacketConn) error {
+	defer p.Close()
 
 	for {
-		buffer := make([]byte, 1024)
-
-		n, addr, err := l.ReadFrom(buffer)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("Received %s from %s\n", string(buffer[:n]), addr)
-
-		go srv.serveUDPPacket(buffer[:n], l, addr)
+		// go srv.serveUDPPacket(buffer[:n], l, addr)
+		go srv.serveUDPPacket(p)
 	}
 }
 
@@ -86,32 +86,39 @@ func (srv *Server) serveTCPConn(conn net.Conn) {
 	//延迟关闭连接
 	// defer conn.Close()
 	for {
-		//阅读conn中的内容
-		//bufio.NewReader打开一个文件，并返回一个文件句柄
 		reader := bufio.NewReader(conn)
-		//开一个128字节大小的字符缓冲区
-		var buf [128]byte
+		w := &response{tcp: conn}
+
+		buffer := make([]byte, 1024)
 		//读取reader中的内容放到buf中，n是大小
-		n, err := reader.Read(buf[:])
+		n, err := reader.Read(buffer[:])
 		if err != nil {
 			fmt.Println("从客户端读取消息失败..., err", err)
 			break
-		} else {
-			fmt.Println("收到一条数据：")
 		}
-		recvStr := string(buf[:n])
-		fmt.Println(recvStr)
-		//回复接收成功
-		fmt.Println("向客户端发送确认消息！")
-		echo := "echo: " + recvStr
-		conn.Write([]byte(echo))
+		fmt.Printf("Received %s \n", string(buffer[:n]))
+		srv.serveCustom(buffer[:n], w)
+		// conn.Write([]byte(echo))
 	}
 }
 
-func (srv *Server) serveUDPPacket(m []byte, u net.PacketConn, addr net.Addr) {
-	_, err := u.WriteTo(m, addr)
-	fmt.Println("123334445")
+func (srv *Server) serveUDPPacket(u net.PacketConn) {
+	buffer := make([]byte, 1024)
+	w := &response{udp: u}
+
+	n, addr, err := u.ReadFrom(buffer)
 	if err != nil {
 		fmt.Println("serveUDPPacket err:", err.Error())
+		return
 	}
+	fmt.Printf("Received %s from %s\n", string(buffer[:n]), addr)
+
+	// _, err := u.WriteTo(m, addr)
+	srv.serveCustom(buffer[:n], w)
+}
+
+func (srv *Server) serveCustom(m []byte, w *response) {
+	req := &Msg{}
+	req.Body = string(m)
+	srv.Handler.ServeCustom(w, req)
 }
