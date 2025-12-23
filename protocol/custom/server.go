@@ -107,6 +107,7 @@ func (srv *Server) serveUDPPacket(u net.PacketConn) {
 	w := &response{udp: u}
 
 	n, addr, err := u.ReadFrom(buffer)
+	w.pcSession = addr
 	if err != nil {
 		fmt.Println("serveUDPPacket err:", err.Error())
 		return
@@ -118,7 +119,10 @@ func (srv *Server) serveUDPPacket(u net.PacketConn) {
 }
 
 func (srv *Server) serveCustom(m []byte, w *response) {
+	// 解析包
 	req := &Msg{}
 	req.Body = string(m)
-	srv.Handler.ServeCustom(w, req)
+	fmt.Println("当前信息:", req.Body)
+	w.udp.WriteTo([]byte("echo"), w.pcSession)
+	// srv.Handler.ServeCustom(w, req)
 }

@@ -3,8 +3,9 @@ package custom
 import "net"
 
 type response struct {
-	udp net.PacketConn
-	tcp net.Conn
+	pcSession net.Addr //当使用通用的 net.PacketConn 时，存储远程地址，用于写回响应。
+	udp       net.PacketConn
+	tcp       net.Conn
 }
 
 func (w *response) LocalAddr() net.Addr {

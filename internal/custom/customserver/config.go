@@ -1,9 +1,14 @@
 package customserver
 
+import "rain-net/internal/custom/plugin"
+
 // 协议特有的配置
-// TODO:配置动态监听,使用uuid,如果变化了定向重启
 type Config struct {
-	Service []Service `yaml:"service"`
+	Service []Service `yaml:"service"` // 服务列表
+
+	Plugin      []plugin.Plugin
+	PluginChain plugin.Handler
+	Registry    map[string]plugin.Handler
 }
 
 type Service struct {

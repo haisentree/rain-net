@@ -2,7 +2,10 @@ package pluginer
 
 type Plugin struct {
 	ServerType string
+	Action     SetupFunc
 }
+
+type SetupFunc func(c *Controller) error
 
 func RegisterPlugin(name string, plugin Plugin) {
 	if name == "" {

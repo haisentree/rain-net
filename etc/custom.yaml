@@ -8,6 +8,6 @@ service:
       - key: node-2
         network: udp
         address: 0.0.0.0:8081
-      - key: node-3
-        network: udp6
-        address: "[::]:8080"
+      # - key: node-3
+      #   network: udp6
+      #   address: "[::]:8080"
