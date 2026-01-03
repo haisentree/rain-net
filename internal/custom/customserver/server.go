@@ -18,6 +18,7 @@ type Server struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 
+	zones  *Config
 	server *custom.Server
 	m      sync.Mutex
 }

@@ -5,9 +5,15 @@ service:
       - key: node-1
         network: tcp 
         address: 0.0.0.0:8080
+        plugin:
+          - printer
+          - writer
       - key: node-2
         network: udp
         address: 0.0.0.0:8081
+        plugin:
+          - printer
+          - writer
       # - key: node-3
       #   network: udp6
       #   address: "[::]:8080"

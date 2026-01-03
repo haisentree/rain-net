@@ -2,6 +2,7 @@ package printer
 
 import (
 	"context"
+	"fmt"
 	"rain-net/internal/custom/plugin"
 )
 
@@ -10,6 +11,7 @@ type Printer struct {
 }
 
 func (p Printer) ServeCustom(ctx context.Context) error {
+	fmt.Println("custom printer")
 	return nil
 }
 

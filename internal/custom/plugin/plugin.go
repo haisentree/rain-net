@@ -10,7 +10,7 @@ type (
 	Plugin func(Handler) Handler
 
 	Handler interface {
-		ServeDNS(context.Context, dns.ResponseWriter, *dns.Msg) (int, error)
+		ServeCustom(context.Context) error
 		Name() string
 	}
 	HandlerFunc func(context.Context, dns.ResponseWriter, *dns.Msg) (int, error)

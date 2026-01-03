@@ -41,11 +41,16 @@ func validateAndExecuteDirectives(yamlfile Input, inst *Instance) error {
 	if !ok {
 		return fmt.Errorf("no server types plugged in")
 	}
-
 	inst.context = stype.NewContext(inst)
 
 	return nil
 }
+
+// 加载配置信息
+func inspectServerBlocks() {}
+
+// 把出现的插件按顺序都加载到instance.Context.Config中
+func executeDirectives() {}
 
 func startWithListenerFds(inst *Instance) error {
 	instancesMu.Lock()

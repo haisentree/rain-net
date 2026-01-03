@@ -2,6 +2,8 @@ package pluginer
 
 type Controller struct {
 	instance *Instance
+
+	// ServerBlockStorage interface{}  用于实现不同插件对应不同路由
 }
 
 func (c *Controller) ServerType() string {
@@ -30,4 +32,8 @@ func (c *Controller) OnShutdown(fn func() error) {
 
 func (c *Controller) OnFinalShutdown(fn func() error) {
 	c.instance.OnFinalShutdown = append(c.instance.OnFinalShutdown, fn)
+}
+
+func (c *Controller) Context() Context {
+	return c.instance.context
 }
