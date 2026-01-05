@@ -45,4 +45,5 @@ func (i *Instance) ShutdownCallbacks() []error {
 
 type Context interface {
 	MakeServers() ([]Server, error)
+	GetConfig() Config
 }

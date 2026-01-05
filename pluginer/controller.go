@@ -1,9 +1,12 @@
 package pluginer
 
 type Controller struct {
-	instance *Instance
+	instance           *Instance
+	Key                string
+	ServerBlockNetwork string
+	ServerBlockAddress string
 
-	// ServerBlockStorage interface{}  用于实现不同插件对应不同路由
+	// ServerBlockStorage interface{}  插件之间配置共享
 }
 
 func (c *Controller) ServerType() string {

@@ -12,7 +12,7 @@ var (
 	// 服务器的类型:dns
 	serverTypes = make(map[string]ServerType)
 	// 插件
-	plugins = make(map[string]map[string]Plugin)
+	Plugins = make(map[string]map[string]Plugin)
 
 	// 进程退出时执行的函数列表
 	OnProcessExit []func()
@@ -24,7 +24,7 @@ var (
 
 func Start(yamlfile Input) (*Instance, error) {
 	inst := &Instance{serverType: yamlfile.ServerType(), wg: new(sync.WaitGroup)}
-	if err := validateAndExecuteDirectives(yamlfile, inst); err != nil {
+	if err := ValidateAndExecuteDirectives(yamlfile, inst); err != nil {
 		return nil, err
 	}
 
@@ -36,21 +36,50 @@ func Start(yamlfile Input) (*Instance, error) {
 	return inst, nil
 }
 
-func validateAndExecuteDirectives(yamlfile Input, inst *Instance) error {
+func ValidateAndExecuteDirectives(yamlfile Input, inst *Instance) error {
 	stype, ok := serverTypes[yamlfile.ServerType()]
 	if !ok {
 		return fmt.Errorf("no server types plugged in")
 	}
 	inst.context = stype.NewContext(inst)
 
-	return nil
+	return executeDirectives(inst, inst.context)
 }
 
 // 加载配置信息
-func inspectServerBlocks() {}
+// func inspectServerBlocks() {}
 
 // 把出现的插件按顺序都加载到instance.Context.Config中
-func executeDirectives() {}
+func executeDirectives(inst *Instance, configer Configer) error {
+	for _, srv := range configer.GetConfig().Service {
+		if srv.Protocol != inst.serverType {
+			continue
+		}
+
+		for _, host := range srv.Host {
+			for _, plugin := range host.Plugin {
+				controller := &Controller{
+					instance:           inst,
+					Key:                fmt.Sprintf("%s://%s", host.Network, host.Address),
+					ServerBlockNetwork: host.Network,
+					ServerBlockAddress: host.Address,
+				}
+
+				setup, err := DirectiveAction(inst.serverType, plugin)
+				if err != nil {
+					return err
+				}
+
+				err = setup(controller)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+	}
+	return nil
+}
 
 func startWithListenerFds(inst *Instance) error {
 	instancesMu.Lock()

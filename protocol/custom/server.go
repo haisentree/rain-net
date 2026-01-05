@@ -77,8 +77,8 @@ func (srv *Server) serveUDP(p net.PacketConn) error {
 	defer p.Close()
 
 	for {
-		// go srv.serveUDPPacket(buffer[:n], l, addr)
-		go srv.serveUDPPacket(p)
+		// go srv.serveUDPPacket(buffer[:n], l, addr)  // 卡死
+		srv.serveUDPPacket(p)
 	}
 }
 
@@ -115,7 +115,7 @@ func (srv *Server) serveUDPPacket(u net.PacketConn) {
 	fmt.Printf("Received %s from %s\n", string(buffer[:n]), addr)
 
 	// _, err := u.WriteTo(m, addr)
-	srv.serveCustom(buffer[:n], w)
+	go srv.serveCustom(buffer[:n], w)
 }
 
 func (srv *Server) serveCustom(m []byte, w *response) {
