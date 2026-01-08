@@ -1,10 +1,13 @@
 package customserver
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"sync"
 	"time"
 
+	"rain-net/internal/custom/plugin"
 	custom "rain-net/protocol/custom"
 )
 
@@ -24,16 +27,28 @@ type Server struct {
 }
 
 // 如果Server只支持TCP或者UDP,对应不存在的方法返回nil
-func NewServer(serviceName string, host Host) (*Server, error) {
+func NewServer(serviceName string, host Host, config *Config) (*Server, error) {
 	server := &Server{
 		Key:     host.Key,
 		Addr:    host.Address,
 		Net:     host.Network,
 		Service: serviceName,
 
+		zones: config,
+
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 5 * time.Second,
 	}
+	if server.zones == nil {
+		fmt.Println("warning: server zones config is nil")
+		return nil, nil
+	}
+
+	var stack plugin.Handler
+	for i := len(server.zones.Plugin) - 1; i >= 0; i-- {
+		stack = server.zones.Plugin[i](stack)
+	}
+	server.zones.PluginChain = stack
 
 	return server, nil
 }
@@ -44,6 +59,12 @@ func (s *Server) Serve(l net.Listener) (err error) {
 		Listener:     l,
 		ReadTimeout:  s.ReadTimeout,
 		WriteTimeout: s.WriteTimeout,
+
+		Handler: custom.HandlerFunc(func(w custom.ResponseWriter, r *custom.Msg) {
+			ctx := context.Background()
+			fmt.Println("handle:", s.zones.PluginChain.Name())
+			s.zones.PluginChain.ServeCustom(ctx, w, r)
+		}),
 	}
 
 	s.m.Unlock()
@@ -57,6 +78,12 @@ func (s *Server) ServePacket(p net.PacketConn) (err error) {
 		PacketConn:   p,
 		ReadTimeout:  s.ReadTimeout,
 		WriteTimeout: s.WriteTimeout,
+
+		Handler: custom.HandlerFunc(func(w custom.ResponseWriter, r *custom.Msg) {
+			ctx := context.Background()
+			fmt.Println("handle:", s.zones.PluginChain.Name())
+			s.zones.PluginChain.ServeCustom(ctx, w, r)
+		}),
 	}
 	s.m.Unlock()
 	return s.server.ActivateAndServe()
@@ -85,4 +112,9 @@ func (s *Server) ListenPacket() (net.PacketConn, error) {
 	}
 
 	return p, nil
+}
+
+func (s *Server) ServeCustom(ctx context.Context, w custom.ResponseWriter, r *custom.Msg) {
+	fmt.Println("s.zones.PluginChain:", s.zones.PluginChain.Name())
+	s.zones.PluginChain.ServeCustom(ctx, w, r)
 }

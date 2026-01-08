@@ -66,7 +66,7 @@ func (h *customContext) MakeServers() ([]pluginer.Server, error) {
 		fmt.Printf("zone: %s, config: %+v\n", zone, cfg)
 	}
 
-	servers, err := makeServersForGroup(h.Configs.Service)
+	servers, err := h.makeServersForGroup(h.Configs.Service)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (h *customContext) GetConfig() pluginer.Config {
 
 // }
 
-func makeServersForGroup(srvList []Service) ([]pluginer.Server, error) {
+func (h *customContext) makeServersForGroup(srvList []Service) ([]pluginer.Server, error) {
 	var servers []pluginer.Server
 
 	for _, srv := range srvList {
@@ -120,13 +120,15 @@ func makeServersForGroup(srvList []Service) ([]pluginer.Server, error) {
 		for _, host := range srv.Host {
 			switch host.Network {
 			case "tcp":
-				s, err := NewServer(srv.Name, host)
+				key := fmt.Sprintf("%s://%s", host.Network, host.Address)
+				s, err := NewServer(srv.Name, host, h.ZoneToConfigs[key])
 				if err != nil {
 					fmt.Println("tcp NewServer err:", err.Error())
 				}
 				servers = append(servers, s)
 			case "udp":
-				s, err := NewServer(srv.Name, host)
+				key := fmt.Sprintf("%s://%s", host.Network, host.Address)
+				s, err := NewServer(srv.Name, host, h.ZoneToConfigs[key])
 				if err != nil {
 					fmt.Println("udp NewServer err:", err.Error())
 				}

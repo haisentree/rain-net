@@ -14,6 +14,10 @@ type Handler interface {
 
 type HandlerFunc func(ResponseWriter, *Msg)
 
+func (f HandlerFunc) ServeCustom(w ResponseWriter, r *Msg) {
+	f(w, r)
+}
+
 type Server struct {
 	Addr         string
 	Net          string
@@ -124,5 +128,6 @@ func (srv *Server) serveCustom(m []byte, w *response) {
 	req.Body = string(m)
 	fmt.Println("当前信息:", req.Body)
 	w.udp.WriteTo([]byte("echo"), w.pcSession)
-	// srv.Handler.ServeCustom(w, req)
+	fmt.Println("srv.Handler:", srv.Handler)
+	srv.Handler.ServeCustom(w, req)
 }
