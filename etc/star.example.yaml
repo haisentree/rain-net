@@ -1,0 +1,20 @@
+service:
+  - name: test-1
+    type: star
+    listeners:
+      - listenerName: listener-0
+      - handlerName: handler-0
+
+listenerList:
+  - name: listener-0
+  - type: tcp
+  - addr: 0.0.0.0:8081
+
+  - name: listener-1
+  - type: udp
+  - addr: 0.0.0.0:8082
+
+handlerList:
+  - name: handler-0
+  - protocol: 
+    - socks5
