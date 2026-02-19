@@ -51,7 +51,6 @@ func ValidateAndExecuteDirectives(yamlfile Input, inst *Instance) error {
 
 // 把出现的插件按顺序都加载到instance.Context.Config中
 func executeDirectives(inst *Instance, configer Configer) error {
-	fmt.Println(configer.GetConfig())
 	for _, srv := range configer.GetConfig().Service {
 		if srv.Protocol != inst.serverType {
 			continue

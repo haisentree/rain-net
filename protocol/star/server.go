@@ -73,6 +73,7 @@ func (srv *Server) serveTCP(l net.Listener) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println("123")
 		go srv.serveTCPConn(rw)
 	}
 }
@@ -117,7 +118,7 @@ func (srv *Server) serveUDPPacket(u net.PacketConn) {
 }
 
 func (srv *Server) ServeStar(m []byte, w *response) {
-	w.udp.WriteTo([]byte("echo"), w.pcSession)
-	fmt.Println("srv.Handler:", srv.Handler)
+	// w.udp.WriteTo([]byte("echo"), w.pcSession)
+	w.tcp.Write([]byte("echo"))
 	srv.Handler.ServeStar(w, m)
 }

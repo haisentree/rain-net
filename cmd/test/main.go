@@ -5,5 +5,6 @@ import (
 )
 
 func main() {
-	netBase.TcpServerStart()
+	// netBase.TcpServerStart()
+	netBase.TcpClientStart()
 }

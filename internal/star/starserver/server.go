@@ -28,6 +28,8 @@ type Server struct {
 func NewServer(serviceName string, host pluginer.Host, config *Config) (*Server, error) {
 	server := &Server{
 		Name: serviceName,
+		Net:  host.Network,
+		Addr: host.Address,
 
 		zones: config,
 
@@ -45,13 +47,13 @@ func NewServer(serviceName string, host pluginer.Host, config *Config) (*Server,
 		stack = server.zones.Plugin[i](stack)
 	}
 	server.zones.PluginChain = stack
-
 	return server, nil
 }
 
 func (s *Server) Serve(l net.Listener) (err error) {
 	s.m.Lock()
 	s.server = &star.Server{
+		Net:          s.Net,
 		Listener:     l,
 		ReadTimeout:  s.ReadTimeout,
 		WriteTimeout: s.WriteTimeout,
@@ -62,7 +64,6 @@ func (s *Server) Serve(l net.Listener) (err error) {
 			s.zones.PluginChain.ServeStar(ctx, w, data)
 		}),
 	}
-
 	s.m.Unlock()
 	return s.server.ActivateAndServe()
 }

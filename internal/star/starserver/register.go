@@ -43,6 +43,16 @@ func newContext(i *pluginer.Instance) pluginer.Context {
 		panic(err)
 	}
 
+	config.ListenerMap = make(map[string]ListenerList, len(config.ListenerList))
+	config.HandlerMap = make(map[string]HandlerList, len(config.HandlerList))
+
+	for _, val := range config.ListenerList {
+		config.ListenerMap[val.Name] = val
+	}
+	for _, val := range config.HandlerList {
+		config.HandlerMap[val.Name] = val
+	}
+
 	return &starContext{
 		Configs:       &config,
 		ZoneToConfigs: make(map[string]*Config),
@@ -99,17 +109,16 @@ func (h *starContext) GetConfig() pluginer.Config {
 			targetHost := pluginer.Host{
 				Network: ListenerMap[val.ListenerName].Type,
 				Address: ListenerMap[val.ListenerName].Addr,
-				Plugin:  HandlerMap[val.HandlerName].Protocol,
+				Plugin:  HandlerMap[val.HandlerName].Plugins,
 			}
 
-			copy(targetHost.Plugin, HandlerMap[val.ListenerName].Protocol)
+			copy(targetHost.Plugin, HandlerMap[val.ListenerName].Plugins)
 
 			targetSrv.Host = append(targetSrv.Host, targetHost)
 		}
 
 		targetConfig.Service = append(targetConfig.Service, targetSrv)
 	}
-
 	return targetConfig
 }
 
@@ -135,6 +144,13 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 				s, err := NewServer(srv.Name, host, h.ZoneToConfigs[key])
 				if err != nil {
 					fmt.Println("udp NewServer err:", err.Error())
+				}
+				servers = append(servers, s)
+			case "socks5":
+				key := fmt.Sprintf("%s://%s", host.Network, host.Address)
+				s, err := NewServer(srv.Name, host, h.ZoneToConfigs[key])
+				if err != nil {
+					fmt.Println("socks5 NewServer err:", err.Error())
 				}
 				servers = append(servers, s)
 			default:

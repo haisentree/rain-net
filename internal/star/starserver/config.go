@@ -11,6 +11,9 @@ type Config struct {
 	ListenerList []ListenerList `yaml:"listenerList"`
 	HandlerList  []HandlerList  `yaml:"handlerList"`
 
+	ListenerMap map[string]ListenerList
+	HandlerMap  map[string]HandlerList
+
 	Plugin      []plugin.Plugin
 	PluginChain plugin.Handler
 	Registry    map[string]plugin.Handler
@@ -29,8 +32,8 @@ type ListenerList struct {
 }
 
 type HandlerList struct {
-	Name     string   `yaml:"name"`
-	Protocol []string `yaml:"protocol"`
+	Name    string   `yaml:"name"`
+	Plugins []string `yaml:"plugins"`
 }
 
 type Listeners struct {
@@ -42,17 +45,6 @@ func (c *Config) GetConfig() pluginer.Config {
 	targetConfig := pluginer.Config{
 		Service: make([]pluginer.Service, 0, len(c.Service)),
 	}
-
-	ListenerMap := make(map[string]ListenerList, len(c.ListenerList))
-	HandlerMap := make(map[string]HandlerList, len(c.HandlerList))
-
-	for _, val := range c.ListenerList {
-		ListenerMap[val.Name] = val
-	}
-	for _, val := range c.HandlerList {
-		HandlerMap[val.Name] = val
-	}
-
 	for _, srcSrv := range c.Service {
 
 		targetSrv := pluginer.Service{
@@ -60,14 +52,15 @@ func (c *Config) GetConfig() pluginer.Config {
 			Protocol: srcSrv.Type,
 			Host:     make([]pluginer.Host, 0, len(srcSrv.Listeners)),
 		}
+
 		for _, val := range srcSrv.Listeners {
 			targetHost := pluginer.Host{
-				Network: ListenerMap[val.ListenerName].Type,
-				Address: ListenerMap[val.ListenerName].Addr,
+				Network: c.ListenerMap[val.ListenerName].Type,
+				Address: c.ListenerMap[val.ListenerName].Addr,
 				Plugin:  make([]string, 1),
 			}
 
-			copy(targetHost.Plugin, HandlerMap[val.ListenerName].Protocol)
+			copy(targetHost.Plugin, c.HandlerMap[val.ListenerName].Plugins)
 
 			targetSrv.Host = append(targetSrv.Host, targetHost)
 		}

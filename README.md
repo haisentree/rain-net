@@ -9,3 +9,7 @@
 2025.12.23
 
 额,名字没问题。caddy会先加载所有插件存储在	plugins = make(map[string]map[string]Plugin) 中,然后使用的时候,根据配置文件,把插件加载到Context.Plugin中,在serveDNS的时候构造链式插件
+
+
+## Star代理转发协议
+

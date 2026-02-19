@@ -3,18 +3,27 @@ service:
     type: star
     listeners:
       - listenerName: listener-0
-      - handlerName: handler-0
+        handlerName: handler-0
+
+      # - listenerName: listener-1
+      #   handlerName: handler-1
 
 listenerList:
   - name: listener-0
-  - type: tcp
-  - addr: 0.0.0.0:8081
+    type: tcp
+    addr: 0.0.0.0:8083
 
   - name: listener-1
-  - type: udp
-  - addr: 0.0.0.0:8082
+    type: udp
+    addr: 0.0.0.0:8084
 
 handlerList:
   - name: handler-0
-  - protocol: 
-    - socks5
+    plugins: 
+      - httpProxy
+      - socks5
+
+  
+  - name: handler-1
+    plugins: 
+      - httpProxy
