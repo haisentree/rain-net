@@ -73,7 +73,6 @@ func (srv *Server) serveTCP(l net.Listener) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("123")
 		go srv.serveTCPConn(rw)
 	}
 }
@@ -87,18 +86,30 @@ func (srv *Server) serveUDP(p net.PacketConn) error {
 }
 
 func (srv *Server) serveTCPConn(conn net.Conn) {
-	for {
-		reader := bufio.NewReader(conn)
-		w := &response{tcp: conn}
+	// reader := bufio.NewReader(conn)
+	w := &response{
+		tcp:    conn,
+		reader: bufio.NewReader(conn),
+		writer: bufio.NewWriter(conn),
 
-		buffer := make([]byte, 1024)
-		n, err := reader.Read(buffer[:])
-		if err != nil {
-			fmt.Println("从客户端读取消息失败..., err", err)
+		keepAlive: false, // 防止使用没有调用read的handle,导致死循环
+	}
+	buffer := make([]byte, 1024)
+
+	for {
+
+		// n, err := reader.Read(buffer[:])
+		// if err != nil {
+		// 	fmt.Println("从客户端读取消息失败..., err", err)
+		// 	break
+		// }
+		// fmt.Printf("Received %s \n", string(buffer[:n]))
+
+		// handle中read数据,buffer弃用
+		srv.ServeStar(buffer[:], w)
+		if !w.keepAlive {
 			break
 		}
-		fmt.Printf("Received %s \n", string(buffer[:n]))
-		srv.ServeStar(buffer[:n], w)
 	}
 }
 
@@ -119,6 +130,6 @@ func (srv *Server) serveUDPPacket(u net.PacketConn) {
 
 func (srv *Server) ServeStar(m []byte, w *response) {
 	// w.udp.WriteTo([]byte("echo"), w.pcSession)
-	w.tcp.Write([]byte("echo"))
+	// w.tcp.Write([]byte("echo"))
 	srv.Handler.ServeStar(w, m)
 }

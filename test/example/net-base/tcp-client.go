@@ -1,12 +1,9 @@
 package base
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"net"
-	"os"
-	"strings"
 	"time"
 )
 
@@ -26,14 +23,15 @@ func TcpClientStart() {
 	}
 	defer conn.Close()
 
-	inputReader := bufio.NewReader(os.Stdin)
+	// inputReader := bufio.NewReader(os.Stdin)
 	for {
-		input, _ := inputReader.ReadString('\n') // 读取用户输入
-		inputInfo := strings.Trim(input, "\r\n")
-		if strings.ToUpper(inputInfo) == "Q" { // 如果输入q就退出
-			return
-		}
-		_, err = conn.Write([]byte(inputInfo)) // 发送数据
+		// input, _ := inputReader.ReadString('\n') // 读取用户输入
+		// inputInfo := strings.Trim(input, "\r\n")
+		// if strings.ToUpper(inputInfo) == "Q" { // 如果输入q就退出
+		// 	return
+		// }
+
+		_, err = conn.Write([]byte("CONNECT secure.example.com:443 HTTP/1.1\r\nHost: secure.example.com:443\r\nProxy-Connection: Keep-Alive\r\n\r\n")) // 发送数据
 		if err != nil {
 			return
 		}
@@ -44,5 +42,6 @@ func TcpClientStart() {
 			return
 		}
 		fmt.Println(string(buf[:n]))
+		break
 	}
 }

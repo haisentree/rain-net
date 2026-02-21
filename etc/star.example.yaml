@@ -23,7 +23,6 @@ handlerList:
       - httpProxy
       - socks5
 
-  
   - name: handler-1
     plugins: 
       - httpProxy
