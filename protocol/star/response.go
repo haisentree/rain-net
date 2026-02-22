@@ -30,6 +30,10 @@ func (w *response) GetReader() *bufio.Reader {
 	return w.reader
 }
 
+func (w *response) GetConn() net.Conn {
+	return w.tcp
+}
+
 func (w *response) SetKeepAlive(status bool) {
 	w.keepAlive = status
 }

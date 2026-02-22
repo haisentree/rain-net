@@ -20,9 +20,14 @@ listenerList:
 handlerList:
   - name: handler-0
     plugins: 
-      - httpProxy
       - socks5
+      - httpProxy
 
   - name: handler-1
     plugins: 
       - httpProxy
+
+dailerList:
+  - name: dailer-0
+    type: tcp
+    addr: 0.0.0.0:8083 

@@ -10,4 +10,5 @@ type ResponseWriter interface {
 	GetReader() *bufio.Reader
 	SetKeepAlive(status bool)
 	Write(m []byte) (int, error)
+	GetConn() net.Conn
 }

@@ -14,6 +14,7 @@ import (
 
 type HttpProxy struct {
 	Next plugin.Handler
+	// http.client
 }
 
 func (p HttpProxy) ServeStar(ctx context.Context, w star.ResponseWriter, data []byte) error {
@@ -57,7 +58,7 @@ func handleHTTP(w star.ResponseWriter, r *http.Request) {
 	if targetURL.Host == "" {
 		targetURL.Host = r.Host
 	}
-
+	// todo: 为复用http客户端
 	// 创建一个新请求，复制原请求的 Header 和 Body
 	proxyReq, err := http.NewRequest(r.Method, targetURL.String(), r.Body)
 	if err != nil {
@@ -117,6 +118,8 @@ func handleCONNECT(w star.ResponseWriter, req *http.Request) error {
 	case <-errChan:
 		// 其中一个方向结束，关闭连接
 		return errors.New("errChan")
+		// 	case <-ctx.Done():
+		// // 上下文取消，停止复制
 	}
 
 	return nil
