@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"rain-net/internal/star/plugin"
-	"rain-net/pluginer"
 	"rain-net/protocol/star"
 	"sync"
 	"time"
@@ -25,11 +24,11 @@ type Server struct {
 	m     sync.Mutex
 }
 
-func NewServer(serviceName string, host pluginer.Host, config *Config) (*Server, error) {
+func NewServer(serviceName, transport, addr string, config *Config) (*Server, error) {
 	server := &Server{
 		Name: serviceName,
-		Net:  host.Network,
-		Addr: host.Address,
+		Net:  transport,
+		Addr: addr,
 
 		zones: config,
 

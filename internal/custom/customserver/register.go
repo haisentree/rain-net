@@ -25,7 +25,7 @@ func newDirectives() []string {
 
 func newDefaultInput() pluginer.Input {
 	return pluginer.YAMLFileInput{
-		Filepath:       "/root/Project/DnsGit/rain-net/etc/custom.yaml",
+		Filepath:       "/root/Project/rain-net/etc/custom.yaml",
 		Contents:       []byte("default"),
 		ServerTypeName: serverType,
 	}
@@ -82,9 +82,9 @@ func (h *customContext) GetConfig() pluginer.Config {
 	for _, srcSrv := range h.Configs.Service {
 
 		targetSrv := pluginer.Service{
-			Name:     srcSrv.Name,
-			Protocol: srcSrv.Protocol,
-			Host:     make([]pluginer.Host, 0, len(srcSrv.Host)),
+			Name:        srcSrv.Name,
+			ServiceType: srcSrv.Protocol,
+			Host:        make([]pluginer.Host, 0, len(srcSrv.Host)),
 		}
 		for _, srcHost := range srcSrv.Host {
 			targetHost := pluginer.Host{

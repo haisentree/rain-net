@@ -6,7 +6,7 @@ func Run() {
 	// pluginer.TrapSignalsCrossPlatform()
 
 	yamlFileInput := pluginer.YAMLFileInput{
-		Filepath:       "/root/Project/DnsGit/rain-net/etc/custom.yaml",
+		Filepath:       "/root/Project/rain-net/etc/custom.yaml",
 		Contents:       []byte("custom"),
 		ServerTypeName: "custom",
 	}

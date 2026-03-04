@@ -1,21 +1,22 @@
 package pluginer
 
+// 代理caddyfile结构的配置
 type Configer interface {
 	GetConfig() Config
 }
 
 type Config struct {
-	Service []Service `yaml:"service"`
+	Service []Service
 }
 
 type Service struct {
-	Name     string `yaml:"name"`
-	Protocol string `yaml:"protocol"`
-	Host     []Host `yaml:"host"`
+	Name        string
+	ServiceType string
+	Host        []Host
 }
 
 type Host struct {
-	Network string   `yaml:"network"`
-	Address string   `yaml:"address"`
-	Plugin  []string `yaml:"plugin"`
+	Network string
+	Address string
+	Plugin  []string
 }

@@ -5,29 +5,56 @@ service:
       - listenerName: listener-0
         handlerName: handler-0
 
-      # - listenerName: listener-1
-      #   handlerName: handler-1
+      - listenerName: listener-1
+        handlerName: handler-1
 
 listenerList:
   - name: listener-0
     type: tcp
-    addr: 0.0.0.0:8083
+    transport: tcp
+    addr: 0.0.0.0:5170
 
   - name: listener-1
-    type: udp
-    addr: 0.0.0.0:8084
+    type: tcp
+    transport: tcp
+    addr: 0.0.0.0:5171
+
+  - name: listener-2
+    type: proxy
+    # transport: kcp、http2
+    addr: 0.0.0.0:8085
+  
+  - name: listener-3
+    type: ctrlproxy
+    addr: 0.0.0.0:8086
 
 handlerList:
   - name: handler-0
     plugins: 
-      - socks5
       - httpProxy
+      - socks5
 
   - name: handler-1
     plugins: 
+      - socks5
       - httpProxy
+
 
 dailerList:
   - name: dailer-0
+    type: tcp
+    addr: 0.0.0.0:8083
+  
+  - name: dailer-0
+    type: tcp
+    addr: 0.0.0.0:8084 
+
+bridgerList:
+  - name: bridger-0
+    type: tcp
+    addr: 0.0.0.0:8083 
+
+routerList:
+  - name: routers-0
     type: tcp
     addr: 0.0.0.0:8083 

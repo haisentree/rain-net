@@ -50,14 +50,16 @@ func ValidateAndExecuteDirectives(yamlfile Input, inst *Instance) error {
 // func inspectServerBlocks() {}
 
 // 把出现的插件按顺序都加载到instance.Context.Config中
+// 目前只判断使用的插件是否存在
 func executeDirectives(inst *Instance, configer Configer) error {
 	for _, srv := range configer.GetConfig().Service {
-		if srv.Protocol != inst.serverType {
+		if srv.ServiceType != inst.serverType {
 			continue
 		}
 
 		for _, host := range srv.Host {
 			for _, plugin := range host.Plugin {
+				// controller用于插件之间传值
 				controller := &Controller{
 					instance:           inst,
 					Key:                fmt.Sprintf("%s://%s", host.Network, host.Address),
@@ -69,6 +71,7 @@ func executeDirectives(inst *Instance, configer Configer) error {
 					return err
 				}
 
+				// 初始化插件
 				err = setup(controller)
 				if err != nil {
 					return err
@@ -111,18 +114,18 @@ func startServers(serverList []Server, inst *Instance) error {
 	)
 
 	for _, s := range serverList {
-		if ln == nil {
-			ln, err = s.Listen()
-			if err != nil {
-				return fmt.Errorf("Listen: %v", err)
-			}
+		// if ln == nil {
+		ln, err = s.Listen()
+		if err != nil {
+			return fmt.Errorf("Listen: %v", err)
 		}
-		if pc == nil {
-			pc, err = s.ListenPacket()
-			if err != nil {
-				return fmt.Errorf("ListenPacket: %v", err)
-			}
+		// }
+		// if pc == nil {
+		pc, err = s.ListenPacket()
+		if err != nil {
+			return fmt.Errorf("ListenPacket: %v", err)
 		}
+		// }
 		inst.servers = append(inst.servers, ServerListener{server: s, listener: ln, packet: pc})
 	}
 

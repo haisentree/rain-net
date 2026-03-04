@@ -38,9 +38,9 @@ func (c *Config) GetConfig() pluginer.Config {
 	for _, srcSrv := range c.Service {
 
 		targetSrv := pluginer.Service{
-			Name:     srcSrv.Name,
-			Protocol: srcSrv.Protocol,
-			Host:     make([]pluginer.Host, 0, len(srcSrv.Host)),
+			Name:        srcSrv.Name,
+			ServiceType: srcSrv.Protocol,
+			Host:        make([]pluginer.Host, 0, len(srcSrv.Host)),
 		}
 		for _, srcHost := range srcSrv.Host {
 			targetHost := pluginer.Host{
