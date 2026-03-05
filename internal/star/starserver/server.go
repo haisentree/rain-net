@@ -14,6 +14,7 @@ type Server struct {
 	Name string
 	Net  string
 	Addr string
+	// Type string
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration

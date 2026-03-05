@@ -20,13 +20,35 @@ listenerList:
     addr: 0.0.0.0:5171
 
   - name: listener-2
-    type: proxy
+    type: tcp
+    addr: 0.0.0.0:8086
+
+  - name: listener-3
+    type: proxy         # 代理功能,可以通过bridger与当前主机其他的listener建立通道
     # transport: kcp、http2
     addr: 0.0.0.0:8085
+    settings:
+      proxyName: proxy-0
+      bridger: bridger-0
+      clientProxyServer: clientProxy-Service-0
+
   
-  - name: listener-3
+  - name: listener-4
     type: ctrlproxy
     addr: 0.0.0.0:8086
+    settings:
+      connect:
+        - masterName: master-0
+          proxyName: proxy-0
+          clientName: client-0
+          streamId: stream-0
+      clientProxy:
+        - clientProxyName: clientProxy-0
+          streamId: dailer-0-stream-1  # 把客户端的流注册到
+          addr: 192.168.3.2:80   # 这个地址从服务端的配置获取
+          transport: tcp
+          keyPassword: dsawdfsfweweefwfe
+  
 
 handlerList:
   - name: handler-0
@@ -39,22 +61,27 @@ handlerList:
       - socks5
       - httpProxy
 
-
+# 后期单独开启一个流,进行控制和下发配置信息
 dailerList:
   - name: dailer-0
-    type: tcp
-    addr: 0.0.0.0:8083
+    type: clientProxy
+    addr: 192.168.3.2:80 # 控制代理接口
+    settings:
+      connect:
+        - clientProxyName: clientProxy-0
+          keyPassword: dsawdfsfweweefwfe
   
-  - name: dailer-0
+  - name: dailer-1
     type: tcp
     addr: 0.0.0.0:8084 
 
+# bridger用户进程间网络通讯
 bridgerList:
   - name: bridger-0
-    type: tcp
-    addr: 0.0.0.0:8083 
 
 routerList:
   - name: routers-0
     type: tcp
     addr: 0.0.0.0:8083 
+
+# 配置中心 configCenter
