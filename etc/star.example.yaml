@@ -1,13 +1,17 @@
 service:
   - name: test-1
     type: star
-    listeners:
-      - listenerName: listener-0
-        handlerName: handler-0
+    listeners:    # 监听服务+handle
+      # - listenerName: listener-0
+      #   handlerName: handler-0
 
-      - listenerName: listener-1
-        handlerName: handler-1
+      # - listenerName: listener-1
+      #   handlerName: handler-1
 
+      - listenerName: listener-4
+        handlerName: handler-2
+
+# TODO:IO密集型场景使用单线程+事件消息模型进行处理,对比性能
 listenerList:
   - name: listener-0
     type: tcp
@@ -25,29 +29,38 @@ listenerList:
 
   - name: listener-3
     type: proxy         # 代理功能,可以通过bridger与当前主机其他的listener建立通道
+    transport: tcp
     # transport: kcp、http2
     addr: 0.0.0.0:8085
     settings:
-      proxyName: proxy-0
+      proxyName: listener-proxy-0
       bridger: bridger-0
-      clientProxyServer: clientProxy-Service-0
 
-  
   - name: listener-4
     type: ctrlproxy
-    addr: 0.0.0.0:8086
+    transport: tcp
+    addr: 0.0.0.0:5172
     settings:
       connect:
-        - masterName: master-0
-          proxyName: proxy-0
-          clientName: client-0
+        - proxyName: proxy-0
+          bridgeName: bridger-0
+          clientProxyName: clientProxy-0 
           streamId: stream-0
+          ctrlProxyName: ctrlproxy-name-0
       clientProxy:
-        - clientProxyName: clientProxy-0
+        - clientProxyName: clientProxy-0 
           streamId: dailer-0-stream-1  # 把客户端的流注册到
-          addr: 192.168.3.2:80   # 这个地址从服务端的配置获取
+          addr: 192.168.3.2:80   # clientProxy代理的服务
           transport: tcp
           keyPassword: dsawdfsfweweefwfe
+          ctrlProxyName: ctrlproxy-name-0
+        
+        - clientProxyName: clientProxy-1  
+          streamId: dailer-0-stream-2  # 把客户端的流注册到
+          addr: 192.168.3.3:80   # clientProxy代理的服务
+          transport: tcp
+          keyPassword: dsawdfsfweweefwfe
+          ctrlProxyName: ctrlproxy-name-0
   
 
 handlerList:
@@ -61,7 +74,12 @@ handlerList:
       - socks5
       - httpProxy
 
-# 后期单独开启一个流,进行控制和下发配置信息
+  - name: handler-2
+    plugins: 
+      - printer
+
+# 废弃:后期单独开启一个流,进行控制和下发配置信息
+# 校验密码连接后,服务端主动创建一个流后传递配置,再连接流通道
 dailerList:
   - name: dailer-0
     type: clientProxy

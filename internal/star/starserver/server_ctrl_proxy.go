@@ -10,11 +10,10 @@ import (
 	"time"
 )
 
-type ProxyServer struct {
+type CtrlProxyServer struct {
 	Name string
 	Net  string
 	Addr string
-	// Type string
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -25,7 +24,7 @@ type ProxyServer struct {
 	m     sync.Mutex
 }
 
-func NewProxyServer(serviceName, transport, addr string, config *Config) (*Server, error) {
+func NewCtrlProxyServer(serviceName, transport, addr string, config *Config) (*Server, error) {
 	server := &Server{
 		Name: serviceName,
 		Net:  transport,
@@ -50,7 +49,7 @@ func NewProxyServer(serviceName, transport, addr string, config *Config) (*Serve
 	return server, nil
 }
 
-func (s *ProxyServer) Serve(l net.Listener) (err error) {
+func (s *CtrlProxyServer) Serve(l net.Listener) (err error) {
 	s.m.Lock()
 	s.server = &star.Server{
 		Net:          s.Net,
@@ -68,7 +67,7 @@ func (s *ProxyServer) Serve(l net.Listener) (err error) {
 	return s.server.ActivateAndServe()
 }
 
-func (s *ProxyServer) ServePacket(p net.PacketConn) (err error) {
+func (s *CtrlProxyServer) ServePacket(p net.PacketConn) (err error) {
 	s.m.Lock()
 
 	s.server = &star.Server{
@@ -86,7 +85,7 @@ func (s *ProxyServer) ServePacket(p net.PacketConn) (err error) {
 	return s.server.ActivateAndServe()
 }
 
-func (s *ProxyServer) Listen() (net.Listener, error) {
+func (s *CtrlProxyServer) Listen() (net.Listener, error) {
 	if s.Net != "tcp" {
 		return nil, nil
 	}
@@ -98,7 +97,7 @@ func (s *ProxyServer) Listen() (net.Listener, error) {
 	return l, nil
 }
 
-func (s *ProxyServer) ListenPacket() (net.PacketConn, error) {
+func (s *CtrlProxyServer) ListenPacket() (net.PacketConn, error) {
 	if s.Net != "udp" {
 		return nil, nil
 	}
@@ -111,7 +110,7 @@ func (s *ProxyServer) ListenPacket() (net.PacketConn, error) {
 	return p, nil
 }
 
-func (s *ProxyServer) ServeStar(ctx context.Context, w star.ResponseWriter, data []byte) {
+func (s *CtrlProxyServer) ServeStar(ctx context.Context, w star.ResponseWriter, data []byte) {
 	fmt.Println("s.zones.PluginChain:", s.zones.PluginChain.Name())
 	s.zones.PluginChain.ServeStar(ctx, w, data)
 }

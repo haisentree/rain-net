@@ -54,6 +54,8 @@ func newContext(i *pluginer.Instance) pluginer.Context {
 		config.HandlerMap[val.Name] = val
 	}
 
+	fmt.Printf("config: %s\n", config.ListenerList[0].Name)
+
 	return &starContext{
 		Configs:       &config,
 		ZoneToConfigs: make(map[string]*Config),
@@ -112,7 +114,8 @@ func (h *starContext) GetConfig() pluginer.Config {
 		}
 		for _, val := range srcSrv.Listeners {
 			targetHost := pluginer.Host{
-				Network: ListenerMap[val.ListenerName].Type,
+				// Network: ListenerMap[val.ListenerName].Type,
+				Network: ListenerMap[val.ListenerName].Transport,
 				Address: ListenerMap[val.ListenerName].Addr,
 				Plugin:  HandlerMap[val.HandlerName].Plugins,
 			}
@@ -197,4 +200,16 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 		}
 	}
 	return servers, nil
+}
+
+func (h *starContext) makeListeners() ([]pluginer.Server, error) {
+	return nil, nil
+}
+
+func (s *starContext) makeBridgers() (err error) {
+	return nil
+}
+
+func (s *starContext) makeDailers() (err error) {
+	return nil
 }

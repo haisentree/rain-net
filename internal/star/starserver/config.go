@@ -28,8 +28,32 @@ type Service struct {
 type ListenerList struct {
 	Name      string `yaml:"name"`
 	Type      string `yaml:"type"`
-	Transport string `yaml:"transport"`
+	Transport string `yaml:"transport,omitempty"`
 	Addr      string `yaml:"addr"`
+
+	Settings Settings `yaml:"settings"`
+}
+
+type Settings struct {
+	Connect     []ConnectItem `yaml:"connect,omitempty"`
+	ClientProxy []ClientProxy `yaml:"clientProxy,omitempty"`
+}
+
+type ConnectItem struct {
+	ProxyName       string `yaml:"proxyName"`
+	BridgeName      string `yaml:"bridgeName"`
+	ClientProxyName string `yaml:"clientProxyName"`
+	StreamId        string `yaml:"streamId"`
+	CtrlProxyName   string `yaml:"ctrlProxyName,omitempty"`
+}
+
+type ClientProxy struct {
+	ClientProxyName string `yaml:"clientProxyName"`
+	StreamId        string `yaml:"streamId"`
+	Addr            string `yaml:"addr"`
+	Transport       string `yaml:"transport"`
+	KeyPassword     string `yaml:"keyPassword,omitempty"`
+	CtrlProxyName   string `yaml:"ctrlProxyName,omitempty"`
 }
 
 type HandlerList struct {
@@ -41,35 +65,6 @@ type Listeners struct {
 	ListenerName string `yaml:"listenerName"`
 	HandlerName  string `yaml:"handlerName"`
 }
-
-// func (c *Config) GetConfig() pluginer.Config {
-// 	targetConfig := pluginer.Config{
-// 		Service: make([]pluginer.Service, 0, len(c.Service)),
-// 	}
-// 	for _, srcSrv := range c.Service {
-
-// 		targetSrv := pluginer.Service{
-// 			Name:        srcSrv.Name,
-// 			ServiceType: srcSrv.Type,
-// 			Host:        make([]pluginer.Host, 0, len(srcSrv.Listeners)),
-// 		}
-
-// 		for _, val := range srcSrv.Listeners {
-// 			targetHost := pluginer.Host{
-// 				Network: c.ListenerMap[val.ListenerName].Type,
-// 				Address: c.ListenerMap[val.ListenerName].Addr,
-// 				Plugin:  make([]string, 1),
-// 			}
-
-// 			copy(targetHost.Plugin, c.HandlerMap[val.ListenerName].Plugins)
-
-// 			targetSrv.Host = append(targetSrv.Host, targetHost)
-// 		}
-
-// 		targetConfig.Service = append(targetConfig.Service, targetSrv)
-// 	}
-// 	return targetConfig
-// }
 
 func (c *Config) AddPlugin(m plugin.Plugin) {
 	c.Plugin = append(c.Plugin, m)

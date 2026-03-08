@@ -8,7 +8,7 @@ import (
 )
 
 func TcpClientStart() {
-	remote := flag.String("remote", "0.0.0.0:8083", "监听的主机地址")
+	remote := flag.String("remote", "8.148.84.185:5172", "监听的主机地址")
 	flag.Parse()
 
 	serverAddr := *remote // 目标服务器地址
