@@ -10,6 +10,8 @@ service:
 
       - listenerName: listener-4
         handlerName: handler-2
+    dailers: # 暂时不绑定handle
+      - dailer-0
 
 # TODO:IO密集型场景使用单线程+事件消息模型进行处理,对比性能
 listenerList:
@@ -41,26 +43,25 @@ listenerList:
     transport: tcp
     addr: 0.0.0.0:5172
     settings:
+      ctrlProxyName: ctrlproxy-name-0
       connect:
-        - proxyName: proxy-0
+        - proxyName: listener-proxy-0
           bridgeName: bridger-0
           clientProxyName: clientProxy-0 
           streamId: stream-0
-          ctrlProxyName: ctrlproxy-name-0
+
       clientProxy:
         - clientProxyName: clientProxy-0 
           streamId: dailer-0-stream-1  # 把客户端的流注册到
           addr: 192.168.3.2:80   # clientProxy代理的服务
           transport: tcp
           keyPassword: dsawdfsfweweefwfe
-          ctrlProxyName: ctrlproxy-name-0
         
         - clientProxyName: clientProxy-1  
           streamId: dailer-0-stream-2  # 把客户端的流注册到
           addr: 192.168.3.3:80   # clientProxy代理的服务
           transport: tcp
           keyPassword: dsawdfsfweweefwfe
-          ctrlProxyName: ctrlproxy-name-0
   
 
 handlerList:
@@ -83,11 +84,10 @@ handlerList:
 dailerList:
   - name: dailer-0
     type: clientProxy
+    transport: tcp
     addr: 192.168.3.2:80 # 控制代理接口
-    settings:
-      connect:
-        - clientProxyName: clientProxy-0
-          keyPassword: dsawdfsfweweefwfe
+    clientProxyName: clientProxy-0
+    keyPassword: dsawdfsfweweefwfe
   
   - name: dailer-1
     type: tcp
@@ -96,10 +96,5 @@ dailerList:
 # bridger用户进程间网络通讯
 bridgerList:
   - name: bridger-0
-
-routerList:
-  - name: routers-0
-    type: tcp
-    addr: 0.0.0.0:8083 
 
 # 配置中心 configCenter

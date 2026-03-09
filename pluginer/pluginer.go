@@ -174,3 +174,26 @@ func startServers(serverList []Server, inst *Instance) error {
 
 	return nil
 }
+
+func startWithClientFds(inst *Instance) error {
+	instancesMu.Lock()
+	instances = append(instances, inst)
+	instancesMu.Unlock()
+
+	serverList, err := inst.context.MakeServers()
+	if err != nil {
+		return err
+	}
+
+	err = startServers(serverList, inst)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// 启动TCP和UDP客户端
+func startClients(serverList []Server, inst *Instance) error {
+	return nil
+}

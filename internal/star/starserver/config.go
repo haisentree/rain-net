@@ -10,9 +10,11 @@ type Config struct {
 	Service      []Service      `yaml:"service"` // 服务列表
 	ListenerList []ListenerList `yaml:"listenerList"`
 	HandlerList  []HandlerList  `yaml:"handlerList"`
+	DailerList   []DailerList   `yaml:"dailerList"`
 
 	ListenerMap map[string]ListenerList
 	HandlerMap  map[string]HandlerList
+	DailerMap   map[string]DailerList
 
 	Plugin      []plugin.Plugin
 	PluginChain plugin.Handler
@@ -23,6 +25,7 @@ type Service struct {
 	Name      string      `yaml:"name"`
 	Type      string      `yaml:"type"`
 	Listeners []Listeners `yaml:"listeners"`
+	Dailers   []string    `yaml:"dailers"`
 }
 
 type ListenerList struct {
@@ -33,10 +36,19 @@ type ListenerList struct {
 
 	Settings Settings `yaml:"settings"`
 }
+type DailerList struct {
+	Name            string `yaml:"name"`
+	Type            string `yaml:"type"`
+	Transport       string `yaml:"transport,omitempty"`
+	Addr            string `yaml:"addr"`
+	ClientProxyName string `yaml:"clientProxyName"`
+	KeyPassword     string `yaml:"keyPassword"`
+}
 
 type Settings struct {
-	Connect     []ConnectItem `yaml:"connect,omitempty"`
-	ClientProxy []ClientProxy `yaml:"clientProxy,omitempty"`
+	CtrlProxyName string        `yaml:"ctrlProxyName,omitempty"`
+	Connect       []ConnectItem `yaml:"connect,omitempty"`
+	ClientProxy   []ClientProxy `yaml:"clientProxy,omitempty"`
 }
 
 type ConnectItem struct {
@@ -44,7 +56,6 @@ type ConnectItem struct {
 	BridgeName      string `yaml:"bridgeName"`
 	ClientProxyName string `yaml:"clientProxyName"`
 	StreamId        string `yaml:"streamId"`
-	CtrlProxyName   string `yaml:"ctrlProxyName,omitempty"`
 }
 
 type ClientProxy struct {
@@ -53,7 +64,6 @@ type ClientProxy struct {
 	Addr            string `yaml:"addr"`
 	Transport       string `yaml:"transport"`
 	KeyPassword     string `yaml:"keyPassword,omitempty"`
-	CtrlProxyName   string `yaml:"ctrlProxyName,omitempty"`
 }
 
 type HandlerList struct {

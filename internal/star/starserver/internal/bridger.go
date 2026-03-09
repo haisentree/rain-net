@@ -3,18 +3,17 @@ package internal
 import "net"
 
 type Bridger struct {
-	Master  Master
-	Slavers []Slvater
+	Name             string
+	ListenerProxyMap map[string]ListeneProxyConn
+	ClientProxyMap   map[string]ClientProxyConn
 }
 
-type Master struct {
-	Name      string
-	Stream    map[string]*net.Conn
-	ProxyConn *net.Conn
+type ListeneProxyConn struct {
+	Name string
+	Conn *net.Conn
 }
 
-type Slvater struct {
-	Name  string
-	Port  string
-	Conns []*net.Conn
+type ClientProxyConn struct {
+	Name string
+	Conn *net.Conn
 }

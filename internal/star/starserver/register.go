@@ -46,6 +46,7 @@ func newContext(i *pluginer.Instance) pluginer.Context {
 
 	config.ListenerMap = make(map[string]ListenerList, len(config.ListenerList))
 	config.HandlerMap = make(map[string]HandlerList, len(config.HandlerList))
+	config.DailerMap = make(map[string]DailerList, len(config.DailerList))
 
 	for _, val := range config.ListenerList {
 		config.ListenerMap[val.Name] = val
@@ -53,8 +54,9 @@ func newContext(i *pluginer.Instance) pluginer.Context {
 	for _, val := range config.HandlerList {
 		config.HandlerMap[val.Name] = val
 	}
-
-	fmt.Printf("config: %s\n", config.ListenerList[0].Name)
+	for _, val := range config.DailerList {
+		config.DailerMap[val.Name] = val
+	}
 
 	return &starContext{
 		Configs:       &config,
@@ -129,45 +131,6 @@ func (h *starContext) GetConfig() pluginer.Config {
 	}
 	return targetConfig
 }
-
-// func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server, error) {
-// 	var servers []pluginer.Server
-
-// 	for _, srv := range h.GetConfig().Service {
-// 		if srv.ServiceType != serverType {
-// 			continue
-// 		}
-
-// 		for _, host := range srv.Host {
-// 			switch host.Network {
-// 			case "tcp":
-// 				key := fmt.Sprintf("%s://%s", host.Network, host.Address)
-// 				s, err := NewServer(srv.Name, host, h.ZoneToConfigs[key])
-// 				if err != nil {
-// 					fmt.Println("tcp NewServer err:", err.Error())
-// 				}
-// 				servers = append(servers, s)
-// 			case "udp":
-// 				key := fmt.Sprintf("%s://%s", host.Network, host.Address)
-// 				s, err := NewServer(srv.Name, host, h.ZoneToConfigs[key])
-// 				if err != nil {
-// 					fmt.Println("udp NewServer err:", err.Error())
-// 				}
-// 				servers = append(servers, s)
-// 			case "socks5":
-// 				key := fmt.Sprintf("%s://%s", host.Network, host.Address)
-// 				s, err := NewServer(srv.Name, host, h.ZoneToConfigs[key])
-// 				if err != nil {
-// 					fmt.Println("socks5 NewServer err:", err.Error())
-// 				}
-// 				servers = append(servers, s)
-// 			default:
-// 				fmt.Println("error")
-// 			}
-// 		}
-// 	}
-// 	return servers, nil
-// }
 
 // 根据特定服务的配置makeserver
 func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server, error) {

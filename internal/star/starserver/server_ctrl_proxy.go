@@ -22,6 +22,8 @@ type CtrlProxyServer struct {
 
 	zones *Config
 	m     sync.Mutex
+
+	CtrlProxy string
 }
 
 func NewCtrlProxyServer(serviceName, transport, addr string, config *Config) (*Server, error) {
