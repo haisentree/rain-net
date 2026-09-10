@@ -2,7 +2,7 @@ package starserver
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"net"
 	"rain-net/internal/star/plugin"
 	"rain-net/protocol/star"
@@ -38,7 +38,7 @@ func NewServer(serviceName, transport, addr string, config *Config) (*Server, er
 	}
 
 	if server.zones == nil {
-		fmt.Println("warning: server zones config is nil")
+		slog.Warn("server zones config is nil")
 		return nil, nil
 	}
 
@@ -60,7 +60,7 @@ func (s *Server) Serve(l net.Listener) (err error) {
 
 		Handler: star.HandlerFunc(func(w star.ResponseWriter, data []byte) {
 			ctx := context.Background()
-			fmt.Println("handle:", s.zones.PluginChain.Name())
+			slog.Debug("handle plugin chain", "chain", s.zones.PluginChain.Name())
 			s.zones.PluginChain.ServeStar(ctx, w, data)
 		}),
 	}
@@ -78,7 +78,7 @@ func (s *Server) ServePacket(p net.PacketConn) (err error) {
 
 		Handler: star.HandlerFunc(func(w star.ResponseWriter, data []byte) {
 			ctx := context.Background()
-			fmt.Println("handle:", s.zones.PluginChain.Name())
+			slog.Debug("handle plugin chain", "chain", s.zones.PluginChain.Name())
 			s.zones.PluginChain.ServeStar(ctx, w, data)
 		}),
 	}
@@ -112,6 +112,6 @@ func (s *Server) ListenPacket() (net.PacketConn, error) {
 }
 
 func (s *Server) ServeStar(ctx context.Context, w star.ResponseWriter, data []byte) {
-	fmt.Println("s.zones.PluginChain:", s.zones.PluginChain.Name())
+	slog.Debug("serve plugin chain", "chain", s.zones.PluginChain.Name())
 	s.zones.PluginChain.ServeStar(ctx, w, data)
 }

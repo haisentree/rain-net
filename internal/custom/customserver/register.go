@@ -25,7 +25,7 @@ func newDirectives() []string {
 
 func newDefaultInput() pluginer.Input {
 	return pluginer.YAMLFileInput{
-		Filepath:       "/root/Project/rain-net/etc/custom.yaml",
+		Filepath:       "etc/custom.yaml",
 		Contents:       []byte("default"),
 		ServerTypeName: serverType,
 	}

@@ -1,4 +1,4 @@
-package httPproxy
+package httpProxy
 
 import (
 	"context"

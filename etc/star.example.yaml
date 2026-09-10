@@ -8,10 +8,17 @@ service:
       # - listenerName: listener-1
       #   handlerName: handler-1
 
-      - listenerName: listener-4
+      - listenerName: listener-3   # proxy 数据面入口
+        handlerName: handler-3
+
+      - listenerName: listener-4   # ctrlproxy 控制通道
         handlerName: handler-2
+
+      - listenerName: listener-5   # admin 管理 API
+        handlerName: handler-4
     dailers: # 暂时不绑定handle
       - dailer-0
+      - dailer-1
 
 # TODO:IO密集型场景使用单线程+事件消息模型进行处理,对比性能
 listenerList:
@@ -35,7 +42,7 @@ listenerList:
     # transport: kcp、http2
     addr: 0.0.0.0:8085
     settings:
-      proxyName: listener-proxy-0
+      proxyName: listener-proxy-0   # 匹配 connect.proxyName
       bridger: bridger-0
 
   - name: listener-4
@@ -44,40 +51,71 @@ listenerList:
     addr: 0.0.0.0:5172
     settings:
       ctrlProxyName: ctrlproxy-name-0
-      connect:
+      tls: true                     # ctrl 通道 TLS 加密
+      certFile: etc/certs/server.crt
+      keyFile: etc/certs/server.key
+      # keyPassword: admin-pwd      # 可选管理员密码,注册不限 clientProxyName
+
+      connect:                      # proxy 监听器的路由规则,多条目标间 round-robin
+        - proxyName: listener-proxy-0
+          bridgeName: bridger-0     # bridger 暂未实现,当前同进程经 hub 直连
+          clientProxyName: clientProxy-0
+          streamId: dailer-0-stream-1
+
         - proxyName: listener-proxy-0
           bridgeName: bridger-0
-          clientProxyName: clientProxy-0 
-          streamId: stream-0
+          clientProxyName: clientProxy-1
+          streamId: dailer-1-stream-1
 
-      clientProxy:
-        - clientProxyName: clientProxy-0 
+      clientProxy:                  # 客户端清单:keyPassword 即各客户端的接入凭据
+        - clientProxyName: clientProxy-0
           streamId: dailer-0-stream-1  # 把客户端的流注册到
-          addr: 192.168.3.2:80   # clientProxy代理的服务
+          addr: 127.0.0.1:9991        # clientProxy代理的服务
           transport: tcp
-          keyPassword: dsawdfsfweweefwfe
-        
-        - clientProxyName: clientProxy-1  
+          keyPassword: pwd-client-0
+
+        - clientProxyName: clientProxy-0
           streamId: dailer-0-stream-2  # 把客户端的流注册到
-          addr: 192.168.3.3:80   # clientProxy代理的服务
+          addr: 127.0.0.1:9992        # clientProxy代理的服务
           transport: tcp
-          keyPassword: dsawdfsfweweefwfe
-  
+          keyPassword: pwd-client-0
+
+        - clientProxyName: clientProxy-1
+          streamId: dailer-1-stream-1  # 把客户端的流注册到
+          addr: 127.0.0.1:9993        # clientProxy代理的服务
+          transport: tcp
+          keyPassword: pwd-client-1
+
+  - name: listener-5
+    type: admin                     # 管理 API:运行时查询与配置,见 docs/admin-api.md
+    transport: tcp
+    addr: 127.0.0.1:5173
+    settings:
+      adminPassword: admin-secret   # 未配置时接口拒绝一切请求
+
 
 handlerList:
   - name: handler-0
-    plugins: 
+    plugins:
       - httpProxy
       - socks5
 
   - name: handler-1
-    plugins: 
+    plugins:
       - socks5
       - httpProxy
 
   - name: handler-2
-    plugins: 
+    plugins:
       - printer
+
+  - name: handler-3
+    plugins: []   # proxy 监听器不使用插件链
+
+  - name: handler-4
+    plugins: []   # admin 监听器不使用插件链
+
+# 管理 API 的使用见 docs/admin-api.md
 
 # 废弃:后期单独开启一个流,进行控制和下发配置信息
 # 校验密码连接后,服务端主动创建一个流后传递配置,再连接流通道
@@ -85,13 +123,20 @@ dailerList:
   - name: dailer-0
     type: clientProxy
     transport: tcp
-    addr: 192.168.3.2:80 # 控制代理接口
+    addr: 127.0.0.1:5172 # ctrl 控制通道地址
     clientProxyName: clientProxy-0
-    keyPassword: dsawdfsfweweefwfe
-  
+    keyPassword: pwd-client-0
+    tls: true            # 与服务端建立 TLS 隧道
+    tlsSkipVerify: true  # 自签名证书场景跳过校验
+
   - name: dailer-1
-    type: tcp
-    addr: 0.0.0.0:8084 
+    type: clientProxy
+    transport: tcp
+    addr: 127.0.0.1:5172
+    clientProxyName: clientProxy-1
+    keyPassword: pwd-client-1
+    tls: true
+    tlsSkipVerify: true
 
 # bridger用户进程间网络通讯
 bridgerList:
