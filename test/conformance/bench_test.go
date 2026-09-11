@@ -44,10 +44,16 @@ func benchEcho(b *testing.B, tr transport.Transport, size int) {
 	b.SetBytes(int64(size))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := conn.Write(payload); err != nil {
+		// 并发读写:镜像 Bridge 的真实行为(边写边读)
+		writeDone := make(chan error, 1)
+		go func() {
+			_, err := conn.Write(payload)
+			writeDone <- err
+		}()
+		if _, err := io.ReadFull(conn, got); err != nil {
 			b.Fatal(err)
 		}
-		if _, err := io.ReadFull(conn, got); err != nil {
+		if err := <-writeDone; err != nil {
 			b.Fatal(err)
 		}
 	}

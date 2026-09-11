@@ -362,13 +362,9 @@ func newServerStreamConn(w http.ResponseWriter, r *http.Request) *serverStreamCo
 	if f != nil {
 		f.Flush()
 	}
-	sc := &serverStreamConn{w: w, flusher: f, r: r.Body, done: make(chan struct{})}
-	go func() {
-		// 客户端断开(请求上下文取消)时收尾,解除 Accept 侧引用
-		<-r.Context().Done()
-		sc.closeOnce.Do(func() { close(sc.done) })
-	}()
-	return sc
+	// done 只由使用方的 Close 关闭:连接断开时 r.Body.Read 自然报错,
+	// 消费方收尾后 handler 才返回——保证不会有 Write 落在 handler 返回之后
+	return &serverStreamConn{w: w, flusher: f, r: r.Body, done: make(chan struct{})}
 }
 
 func (s *serverStreamConn) Read(p []byte) (int, error) {
