@@ -257,12 +257,16 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 		for {
 			select {
 			case payload := <-e.Sink:
+				println("PUMP write:", string(payload))
 				if err := mc.WriteMessage(payload); err != nil {
 					teardown()
 					return
 				}
+				e.ReleaseRecv(len(payload)) // 归还客户端发送额度(流控)
 			case <-e.RemoteClosed:
-				// 客户端内网侧写完:按序排空在途数据
+				// 客户端内网侧写完:排空在途数据。
+				// 读循环与 markRemoteClosed 并发,静默窗口兜住在途帧(50ms 无新数据才收尾)
+				quiet := false
 				for {
 					select {
 					case payload := <-e.Sink:
@@ -270,15 +274,21 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 							teardown()
 							return
 						}
+						e.ReleaseRecv(len(payload))
+						quiet = false
 					default:
-						downDone.Store(true)
-						// 支持半关闭则只关外部写侧,外部仍可继续上行;否则降级整条关闭
-						if cw, ok := mc.(interface{ CloseWrite() error }); ok && cw.CloseWrite() == nil {
-							bothFinished()
+						if quiet {
+							downDone.Store(true)
+							// 支持半关闭则只关外部写侧,外部仍可继续上行;否则降级整条关闭
+							if cw, ok := mc.(interface{ CloseWrite() error }); ok && cw.CloseWrite() == nil {
+								bothFinished()
+								return
+							}
+							teardown()
 							return
 						}
-						teardown()
-						return
+						quiet = true
+						time.Sleep(20 * time.Millisecond)
 					}
 				}
 			case <-e.Done:
@@ -291,9 +301,12 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 	}()
 
 	// 上行:外部连接 -> ctrl 通道(按入站协议解码,ws 消息保留边界)
+	upCtx, upCancel := context.WithCancel(context.Background())
+	defer upCancel()
 	for {
 		payload, err := mc.ReadMessage()
 		if err != nil {
+			slog.Warn("DBG uplink read ended", "err", err, "isEOF", errors.Is(err, io.EOF))
 			if errors.Is(err, io.EOF) {
 				// 外部用户不再上行:半关帧通知客户端(内网连接关写),
 				// 本方向结束,等下行泵收尾
@@ -304,6 +317,10 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 				return
 			}
 			return // defer teardown 整条拆除
+		}
+		// 流控:外部→客户端方向受发送窗口约束(客户端消费后归还额度)
+		if err := e.AcquireSend(upCtx, len(payload)); err != nil {
+			return
 		}
 		if err := e.Client.Send(&star.Message{
 			Type:     star.MsgData,

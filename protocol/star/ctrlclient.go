@@ -41,6 +41,11 @@ type CtrlClient struct {
 	dialAcks  map[uint32]chan ClientConnAck
 	dialSeq   uint32
 
+	// 流控(R8):客户端→服务端方向的每连接发送窗口
+	connsWin map[uint32]*Window
+	// 每连接写泵队列:读循环入队即返回,写侧独立 goroutine(消除跨流头阻塞)
+	connsQ map[uint32]chan []byte
+
 	// LocalDialer 服务端请求建立连接时,按 streamId 拨号内网服务
 	LocalDialer func(streamId string) (net.Conn, error)
 
@@ -88,6 +93,8 @@ func DialCtrlTLS(network, addr string, req HandshakeReq, streams []RegisterStrea
 		conns:     make(map[uint32]rainnet.Conn),
 		dialConns: make(map[uint32]*StreamConn),
 		dialAcks:  make(map[uint32]chan ClientConnAck),
+		connsWin:  make(map[uint32]*Window),
+		connsQ:    make(map[uint32]chan []byte),
 		closed:    make(chan struct{}),
 	}
 
@@ -192,7 +199,14 @@ func (c *CtrlClient) Run() error {
 				sc.deliver(feedItem{data: msg.Payload})
 				continue
 			}
-			c.writeConn(msg.StreamID, msg.Payload)
+			c.mu.RLock()
+			q := c.connsQ[msg.StreamID]
+			c.mu.RUnlock()
+			if q == nil {
+				slog.Debug("data for unknown conn", "conn", msg.StreamID)
+				continue
+			}
+			q <- msg.Payload // 队列仅在单流窗口耗尽时积压(流控保证有界)
 		case MsgStreamClose:
 			if sc := c.dialConn(msg.StreamID); sc != nil {
 				sc.deliver(feedItem{half: msg.IsHalfClose(), full: !msg.IsHalfClose()})
@@ -202,6 +216,7 @@ func (c *CtrlClient) Run() error {
 			// 半关 = 服务端不再上行,内网连接写侧关闭(排空语义由对端负责),
 			// 连接保留,上行泵继续;全关 = 整条终止。notify=false 避免回发关流帧
 			if msg.IsHalfClose() {
+				slog.Warn("DBG client: half close frame for conn", "conn", msg.StreamID)
 				c.halfCloseConn(msg.StreamID)
 			} else {
 				c.closeConn(msg.StreamID, false)
@@ -211,6 +226,18 @@ func (c *CtrlClient) Run() error {
 			if err := c.sess.Send(&Message{Type: MsgPong, StreamID: msg.StreamID, Payload: msg.Payload}); err != nil {
 				runErr = err
 				return err
+			}
+		case MsgWindowUpdate:
+			var wu WindowUpdate
+			if err := DecodeControl(msg, &wu); err != nil {
+				slog.Warn("bad windowUpdate", "err", err)
+				continue
+			}
+			c.mu.RLock()
+			win := c.connsWin[wu.ConnID]
+			c.mu.RUnlock()
+			if win != nil {
+				win.Release(int64(wu.Delta))
 			}
 		case MsgClientConnAck:
 			var ack ClientConnAck
@@ -277,19 +304,50 @@ func (c *CtrlClient) handleConnOpen(msg *Message) {
 	rc := rainnet.Wrap(conn, rainnet.Meta{})
 	c.mu.Lock()
 	c.conns[req.ConnID] = rc
+	c.connsWin[req.ConnID] = NewWindow(DefaultStreamWindow)
+	q := make(chan []byte, 32)
+	c.connsQ[req.ConnID] = q
 	c.mu.Unlock()
+
+	// 写泵:窗口额度归还也在此(消费 32KB 归还一次)
+	go func() {
+		for payload := range q {
+			if _, err := conn.Write(payload); err != nil {
+				c.closeConn(req.ConnID, true)
+				return
+			}
+			_ = c.sess.SendControl(MsgWindowUpdate, WindowUpdate{ConnID: req.ConnID, Delta: uint32(len(payload))})
+		}
+	}()
 
 	go c.pumpUplink(req.ConnID, rc)
 }
 
-// pumpUplink 内网服务 -> ctrl 通道方向:读到多少发多少。
+// pumpUplink 内网服务 -> ctrl 通道方向:读到多少发多少(受发送窗口约束)。
 // 读到 EOF(内网侧写完)发半关帧,连接保留——内网仍可继续收上行数据;
 // 其他错误整条关闭并通知服务端。
 func (c *CtrlClient) pumpUplink(connID uint32, conn rainnet.Conn) {
+	c.mu.RLock()
+	win := c.connsWin[connID]
+	c.mu.RUnlock()
+
+	winCtx, winCancel := context.WithCancel(context.Background())
+	defer winCancel()
+	go func() {
+		<-c.closed
+		winCancel()
+	}()
+
 	buf := make([]byte, uplinkChunk)
 	for {
 		n, err := conn.Read(buf)
+		slog.Warn("DBG pumpUplink read", "conn", connID, "n", n, "err", err)
 		if n > 0 {
+			if win != nil {
+				if werr := win.Acquire(winCtx, int64(n)); werr != nil {
+					return
+				}
+			}
 			if err := c.SendData(connID, buf[:n]); err != nil {
 				break
 			}
@@ -313,35 +371,33 @@ func (c *CtrlClient) halfCloseConn(connID uint32) {
 	conn := c.conns[connID]
 	c.mu.RUnlock()
 	if conn == nil {
+		slog.Warn("DBG halfClose: conn not found", "conn", connID)
 		return
 	}
+	slog.Warn("DBG halfClose: closing intranet write side", "conn", connID)
 	// 本地连接不支持半关闭时无法通知内网,保持现状(降级)
 	_ = conn.CloseWrite()
-}
-
-// writeConn 服务端下行数据写入内网连接
-func (c *CtrlClient) writeConn(connID uint32, payload []byte) {
-	c.mu.RLock()
-	conn := c.conns[connID]
-	c.mu.RUnlock()
-	if conn == nil {
-		slog.Debug("data for unknown conn", "conn", connID)
-		return
-	}
-	if _, err := conn.Write(payload); err != nil {
-		c.closeConn(connID, true)
-	}
 }
 
 // closeConn 关闭并移除一条连接,notify 为 true 时通知服务端
 func (c *CtrlClient) closeConn(connID uint32, notify bool) {
 	c.mu.Lock()
 	conn := c.conns[connID]
+	win := c.connsWin[connID]
+	q := c.connsQ[connID]
 	delete(c.conns, connID)
+	delete(c.connsWin, connID)
+	delete(c.connsQ, connID)
 	c.mu.Unlock()
 
 	if conn == nil {
 		return
+	}
+	if win != nil {
+		win.Close()
+	}
+	if q != nil {
+		close(q) // 写泵退出
 	}
 	conn.Close()
 	if notify {
@@ -430,6 +486,14 @@ func (c *CtrlClient) closeAllConns() {
 	c.dialMu.Unlock()
 	for _, sc := range dials {
 		sc.markClosed(io.EOF)
+	}
+
+	c.mu.Lock()
+	wins := c.connsWin
+	c.connsWin = make(map[uint32]*Window)
+	c.mu.Unlock()
+	for _, w := range wins {
+		w.Close()
 	}
 }
 

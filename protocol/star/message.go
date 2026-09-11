@@ -38,6 +38,9 @@ const (
 	// 连接 ID(低位递增)天然不冲突。之后的 data/streamClose 帧同既有语义。
 	MsgClientConnReq byte = 0x30 // 客户端 → 服务端 请求建立连接
 	MsgClientConnAck byte = 0x31 // 服务端 → 客户端 应答
+
+	// 流控(R8):接收方消费数据后归还额度,发送方超出窗口即阻塞
+	MsgWindowUpdate byte = 0x22 // 双向 窗口额度归还(payload: WindowUpdate JSON)
 )
 
 const (
@@ -152,6 +155,8 @@ func MsgTypeName(t byte) string {
 		return "clientConnReq"
 	case MsgClientConnAck:
 		return "clientConnAck"
+	case MsgWindowUpdate:
+		return "windowUpdate"
 	default:
 		return fmt.Sprintf("unknown(0x%02x)", t)
 	}

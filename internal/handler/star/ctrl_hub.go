@@ -1,10 +1,12 @@
 package starhandler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/haisentree/rain-net/protocol/star"
@@ -41,10 +43,44 @@ type ConnEntry struct {
 
 	once sync.Once
 	rcMb sync.Once
+
+	recvPending atomic.Int64
+
+	// SendWin 外部→客户端方向的发送窗口(R8 流控,客户端以 WindowUpdate 归还)
+	SendWin *star.Window
 }
 
 func (e *ConnEntry) close() {
 	e.once.Do(func() { close(e.Done) })
+	if e.SendWin != nil {
+		e.SendWin.Close()
+	}
+}
+
+// AcquireSend 外部→客户端方向发送前占用窗口额度
+func (e *ConnEntry) AcquireSend(ctx context.Context, n int) error {
+	if e.SendWin == nil {
+		return nil
+	}
+	return e.SendWin.Acquire(ctx, int64(n))
+}
+
+// ReleaseRecv 客户端→外部方向消费 N 字节后,归还客户端的发送额度
+// (发 WindowUpdate 帧给客户端)。内部缓冲 batch 达阈值才发,减少帧开销。
+func (e *ConnEntry) ReleaseRecv(n int) {
+	e.recvPending.Add(int64(n))
+	for {
+		pending := e.recvPending.Load()
+		if pending < int64(64<<10) {
+			return
+		}
+		if e.recvPending.CompareAndSwap(pending, pending-int64(64<<10)) {
+			_ = e.Client.Send(&star.Message{
+				Type: star.MsgWindowUpdate, StreamID: e.ConnID,
+			})
+			return
+		}
+	}
 }
 
 func (e *ConnEntry) markRemoteClosed() {
@@ -92,6 +128,7 @@ func (h *CtrlHub) OpenConn(entry *StreamEntry) (*ConnEntry, error) {
 		Sink:            make(chan []byte, downlinkQueue),
 		Done:            make(chan struct{}),
 		RemoteClosed:    make(chan struct{}),
+		SendWin:         star.NewWindow(star.DefaultStreamWindow),
 	}
 	h.conns[connID] = e
 	h.mu.Unlock()
@@ -121,6 +158,16 @@ func (h *CtrlHub) OpenConn(entry *StreamEntry) (*ConnEntry, error) {
 	h.removeConn(connID)
 	e.close()
 	return nil, err
+}
+
+// WindowRelease 归还外部→客户端方向的发送额度(客户端消费后发起)
+func (h *CtrlHub) WindowRelease(connID uint32, delta uint32) {
+	h.mu.Lock()
+	e := h.conns[connID]
+	h.mu.Unlock()
+	if e != nil && e.SendWin != nil {
+		e.SendWin.Release(int64(delta))
+	}
 }
 
 // Downlink ctrl 读循环投递客户端上行数据,false 表示连接不存在

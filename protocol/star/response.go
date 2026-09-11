@@ -65,3 +65,9 @@ type ClientConnAck struct {
 	OK      bool   `json:"ok"`
 	Message string `json:"message,omitempty"`
 }
+
+// WindowUpdate 流控额度归还:接收方消费 N 字节后告知发送方。
+type WindowUpdate struct {
+	ConnID uint32 `json:"connId"`
+	Delta  uint32 `json:"delta"`
+}

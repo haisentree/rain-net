@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -268,6 +269,9 @@ func (s *CtrlProxyServer) handleConn(conn net.Conn) {
 			return
 		}
 
+		if os.Getenv("STAR_DEBUG") != "" {
+			println("srv frame:", msg.TypeName(), "len", len(msg.Payload), "id", msg.StreamID)
+		}
 		// 节点串联连接的帧(数据/关流)由 feed 消费
 		if msg.Type == star.MsgData || msg.Type == star.MsgStreamClose {
 			if feed.Feed(msg) {
@@ -318,6 +322,16 @@ func (s *CtrlProxyServer) handleConn(conn net.Conn) {
 			} else {
 				slog.Debug("half close for unknown conn", "conn", msg.StreamID)
 			}
+		case star.MsgWindowUpdate:
+			var wu star.WindowUpdate
+			if err := star.DecodeControl(msg, &wu); err != nil {
+				slog.Warn("bad windowUpdate", "err", err, "rawlen", len(msg.Payload), "raw", string(msg.Payload))
+				continue
+			}
+			if os.Getenv("STAR_DEBUG") != "" {
+				println("srv wu: conn", wu.ConnID, "delta", wu.Delta)
+			}
+			s.hub.WindowRelease(wu.ConnID, wu.Delta)
 		case star.MsgClientConnReq:
 			s.handleClientConnReq(sess, feed, identity, msg)
 		default:
