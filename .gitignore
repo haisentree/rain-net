@@ -30,3 +30,9 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+example/
+
+# Reference source code for study (cloned upstream repos)
+third_party/
+
+notebook/
