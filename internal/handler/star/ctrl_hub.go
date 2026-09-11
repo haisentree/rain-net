@@ -1,4 +1,4 @@
-package starserver
+package starhandler
 
 import (
 	"encoding/json"
@@ -28,27 +28,27 @@ type ConnEntry struct {
 	// Client 承载该连接的 ctrl 会话
 	Client *star.Session
 	// stream 所属流(流量统计挂在这里),可为 nil
-	stream *StreamEntry
+	Stream *StreamEntry
 
 	OpenedAt time.Time
 
-	// sink 下行数据队列(ctrl 读循环 -> 外部连接泵)
-	sink chan []byte
+	// Sink 下行数据队列(ctrl 读循环 -> 外部连接泵)
+	Sink chan []byte
 	// done 关闭信号,关闭后下行泵退出且不再接受投递
-	done chan struct{}
-	// remoteClosed 客户端侧后端已关闭:下行泵排空在途数据后收尾
-	remoteClosed chan struct{}
+	Done chan struct{}
+	// RemoteClosed 客户端侧后端已关闭:下行泵排空在途数据后收尾
+	RemoteClosed chan struct{}
 
 	once sync.Once
 	rcMb sync.Once
 }
 
 func (e *ConnEntry) close() {
-	e.once.Do(func() { close(e.done) })
+	e.once.Do(func() { close(e.Done) })
 }
 
 func (e *ConnEntry) markRemoteClosed() {
-	e.rcMb.Do(func() { close(e.remoteClosed) })
+	e.rcMb.Do(func() { close(e.RemoteClosed) })
 }
 
 // CtrlHub ctrl 通道的共享中枢:同一个 starContext 下的 ctrlproxy 与
@@ -87,11 +87,11 @@ func (h *CtrlHub) OpenConn(entry *StreamEntry) (*ConnEntry, error) {
 		ClientProxyName: entry.ClientProxyName,
 		StreamId:        entry.StreamId,
 		Client:          entry.Client,
-		stream:          entry,
+		Stream:          entry,
 		OpenedAt:        time.Now(),
-		sink:            make(chan []byte, downlinkQueue),
-		done:            make(chan struct{}),
-		remoteClosed:    make(chan struct{}),
+		Sink:            make(chan []byte, downlinkQueue),
+		Done:            make(chan struct{}),
+		RemoteClosed:    make(chan struct{}),
 	}
 	h.conns[connID] = e
 	h.mu.Unlock()
@@ -132,14 +132,14 @@ func (h *CtrlHub) Downlink(connID uint32, payload []byte) bool {
 	if e == nil {
 		return false
 	}
-	if e.stream != nil {
-		e.stream.OutBytes.Add(uint64(len(payload)))
+	if e.Stream != nil {
+		e.Stream.OutBytes.Add(uint64(len(payload)))
 	}
 
 	select {
-	case e.sink <- payload:
+	case e.Sink <- payload:
 		return true
-	case <-e.done:
+	case <-e.Done:
 		return false
 	}
 }

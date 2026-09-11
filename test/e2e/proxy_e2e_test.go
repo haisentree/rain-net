@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/internal/star/starserver"
 	"github.com/haisentree/rain-net/protocol/star"
 )
@@ -95,8 +96,8 @@ func TestProxyFailoverAcrossClients(t *testing.T) {
 	backend0 := startFixedServer(t, "from-0")
 	backend1 := startFixedServer(t, "from-1")
 
-	hub := starserver.NewCtrlHub()
-	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
+	hub := starhandler.NewCtrlHub()
+	ctrl := starhandler.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Settings: starserver.Settings{
@@ -225,8 +226,8 @@ func startCloseAfterReplyServer(t *testing.T, reply string) string {
 func TestProxyBackendClosesAfterReply(t *testing.T) {
 	backend := startCloseAfterReplyServer(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok")
 
-	hub := starserver.NewCtrlHub()
-	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
+	hub := starhandler.NewCtrlHub()
+	ctrl := starhandler.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Settings: starserver.Settings{
@@ -288,9 +289,9 @@ func TestProxyBackendClosesAfterReply(t *testing.T) {
 func TestReverseProxyEndToEnd(t *testing.T) {
 	echoAddr := startEchoServer(t)
 
-	hub := starserver.NewCtrlHub()
+	hub := starhandler.NewCtrlHub()
 
-	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
+	ctrl := starhandler.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Settings:  starserver.Settings{KeyPassword: "pwd"},
@@ -465,8 +466,8 @@ func startEOFReactiveServer(t *testing.T, reply string) string {
 func TestProxyHalfCloseEndToEnd(t *testing.T) {
 	backend := startEOFReactiveServer(t, "eof-reactive-ok")
 
-	hub := starserver.NewCtrlHub()
-	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
+	hub := starhandler.NewCtrlHub()
+	ctrl := starhandler.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Settings: starserver.Settings{

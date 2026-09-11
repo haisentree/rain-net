@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/internal/transport"
 	"github.com/haisentree/rain-net/pluginer"
 
@@ -139,7 +140,7 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 	var servers []pluginer.Server
 
 	// ctrl 通道共享中枢:ctrlproxy 往里登记流/路由上行,proxy 从里取流/开连接
-	hub := NewCtrlHub()
+	hub := starhandler.NewCtrlHub()
 
 	// 路由规则表:配置文件静态规则做种子,运行时可经 admin API 动态增删
 	connectTable := NewConnectTable()
@@ -149,7 +150,7 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 	}
 	connectTable.Seed(staticRules)
 
-	var ctrls []*CtrlProxyServer
+	var ctrls []*starhandler.CtrlProxyServer
 	var adminListeners []*ListenerList
 
 	for _, srv := range srvList {
@@ -164,7 +165,7 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 			// 先按监听器类型分发,普通 tcp/udp 监听器走默认分支
 			switch listener.Type {
 			case "ctrlproxy":
-				c := NewCtrlProxyServer(srv.Name, listener, hub)
+				c := starhandler.NewCtrlProxyServer(srv.Name, listener, hub)
 				ctrls = append(ctrls, c)
 				servers = append(servers, c)
 				continue

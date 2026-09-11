@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/pluginer"
 	"github.com/haisentree/rain-net/protocol/codec"
 	"github.com/haisentree/rain-net/protocol/star"
@@ -35,13 +36,13 @@ type ProxyServer struct {
 	inCodec codec.Codec
 
 	settings Settings
-	hub      *CtrlHub
+	hub      *starhandler.CtrlHub
 	rr       atomic.Uint32
 }
 
 var _ pluginer.Server = (*ProxyServer)(nil)
 
-func NewProxyServer(serviceName string, listener *ListenerList, connects *ConnectTable, hub *CtrlHub) (*ProxyServer, error) {
+func NewProxyServer(serviceName string, listener *ListenerList, connects *ConnectTable, hub *starhandler.CtrlHub) (*ProxyServer, error) {
 	// 入站协议适配器:raw(默认)/ws,协议转化在这一层发生
 	c, err := codec.Get(listener.Settings.InCodec)
 	if err != nil {
@@ -65,7 +66,7 @@ func NewProxyServer(serviceName string, listener *ListenerList, connects *Connec
 }
 
 // pickEntry round-robin 挑选一个当前可用的服务流
-func (s *ProxyServer) pickEntry() *StreamEntry {
+func (s *ProxyServer) pickEntry() *starhandler.StreamEntry {
 	targets := s.connects.For(s.proxyName)
 	n := len(targets)
 	if n == 0 {
@@ -172,16 +173,16 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 		defer func() { stop() }()
 		for {
 			select {
-			case payload := <-e.sink:
+			case payload := <-e.Sink:
 				if err := mc.WriteMessage(payload); err != nil {
 					teardown()
 					return
 				}
-			case <-e.remoteClosed:
+			case <-e.RemoteClosed:
 				// 客户端内网侧写完:按序排空在途数据
 				for {
 					select {
-					case payload := <-e.sink:
+					case payload := <-e.Sink:
 						if err := mc.WriteMessage(payload); err != nil {
 							teardown()
 							return
@@ -197,7 +198,7 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 						return
 					}
 				}
-			case <-e.done:
+			case <-e.Done:
 				teardown()
 				return
 			case <-done:
@@ -228,8 +229,8 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 		}); err != nil {
 			return
 		}
-		if e.stream != nil {
-			e.stream.InBytes.Add(uint64(len(payload)))
+		if e.Stream != nil {
+			e.Stream.InBytes.Add(uint64(len(payload)))
 		}
 	}
 }
