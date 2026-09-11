@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"rain-net/internal/star/plugin"
-	"rain-net/internal/star/starserver"
 	"rain-net/protocol/star"
 )
 
