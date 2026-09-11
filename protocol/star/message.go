@@ -43,13 +43,30 @@ const (
 
 	// CtrlStreamID 控制类消息(握手/注册/保活)固定使用的 streamID
 	CtrlStreamID uint32 = 0
+
+	// FlagHalfClose 在 reserved 首字节的标志位:仅适用于 MsgStreamClose 帧。
+	// 置位 = 半关闭("我不再上行",对侧排空在途数据后仍可用本方向收数);
+	// 未置位 = 全关(整条连接终止,历史语义)。旧实现对 reserved 读时忽略,
+	// 收到半关帧会按全关处理——降级但功能可用。
+	FlagHalfClose byte = 0x01
 )
 
 // Message 一条完整的 star 消息
 type Message struct {
 	Type     byte
+	Flags    byte // reserved 首字节的标志位,当前仅 MsgStreamClose 定义了 FlagHalfClose
 	StreamID uint32
 	Payload  []byte
+}
+
+// IsHalfClose 报告该帧是否为半关闭(streamClose + FlagHalfClose)。
+func (m *Message) IsHalfClose() bool {
+	return m.Type == MsgStreamClose && m.Flags&FlagHalfClose != 0
+}
+
+// HalfClose 构造一条半关闭帧:仅停上行,对侧排空在途数据后仍可下行。
+func HalfClose(streamID uint32) *Message {
+	return &Message{Type: MsgStreamClose, Flags: FlagHalfClose, StreamID: streamID}
 }
 
 // WriteMessage 把消息编码为一帧并写入 w,头部和负载合并成一次 Write
@@ -61,7 +78,7 @@ func WriteMessage(w io.Writer, m *Message) error {
 	frame := make([]byte, HeaderSize+len(m.Payload))
 	frame[0] = ProtocolVersion
 	frame[1] = m.Type
-	// frame[2:4] reserved,写 0 留给后续标志位
+	frame[2] = m.Flags // reserved 首字节为标志位,次字节保留
 	binary.BigEndian.PutUint32(frame[4:8], m.StreamID)
 	binary.BigEndian.PutUint32(frame[8:12], uint32(len(m.Payload)))
 	copy(frame[HeaderSize:], m.Payload)
@@ -83,6 +100,7 @@ func ReadMessage(r io.Reader) (*Message, error) {
 
 	m := &Message{
 		Type:     head[1],
+		Flags:    head[2],
 		StreamID: binary.BigEndian.Uint32(head[4:8]),
 	}
 	length := binary.BigEndian.Uint32(head[8:12])
