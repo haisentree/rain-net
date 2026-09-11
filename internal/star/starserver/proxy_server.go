@@ -51,6 +51,14 @@ type ProxyServer struct {
 	chainDialers map[string]*client.Dialer
 	chainMu      sync.Mutex
 	chainRR      atomic.Uint32
+
+	injected net.Listener // 外部注入的监听器(嗅探分发),非 nil 时优先
+}
+
+// UseListener 注入外部监听器(嗅探分发等装配场景),优先于按传输自建
+func (s *ProxyServer) UseListener(ln net.Listener) *ProxyServer {
+	s.injected = ln
+	return s
 }
 
 // ProxyOption 代理监听器可选配置。
@@ -118,8 +126,12 @@ func (s *ProxyServer) pickEntry() *starhandler.StreamEntry {
 	return nil
 }
 
-// Listen 经传输注册表构建(tcp/tls/ws/h2/quic 皆可)——传输转换矩阵的入站半边
+// Listen 经传输注册表构建(tcp/tls/ws/h2/quic 皆可)——传输转换矩阵的入站半边;
+// 注入监听器(单端口嗅探场景)优先
 func (s *ProxyServer) Listen() (net.Listener, error) {
+	if s.injected != nil {
+		return s.injected, nil
+	}
 	if s.Net == "udp" {
 		return nil, nil // 数据面 v1 只做流式传输
 	}

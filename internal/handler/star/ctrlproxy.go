@@ -57,6 +57,8 @@ type CtrlProxyServer struct {
 
 	clientsMu sync.Mutex
 	clients   map[*star.Session]*clientInfo
+
+	injected net.Listener // 外部注入的监听器(嗅探分发),非 nil 时优先
 }
 
 var _ pluginer.Server = (*CtrlProxyServer)(nil)
@@ -175,9 +177,18 @@ func (s *CtrlProxyServer) Kick(clientProxyName string) int {
 	return len(targets)
 }
 
-// Listen 当前监听器地址(供查询)
+// Listen 当前监听器地址;注入监听器(单端口嗅探场景)优先
 func (s *CtrlProxyServer) Listen() (net.Listener, error) {
+	if s.injected != nil {
+		return s.injected, nil
+	}
 	return listenTCP(s.Addr, *s.settings)
+}
+
+// UseListener 注入外部监听器(嗅探分发等装配场景),优先于按地址自建
+func (s *CtrlProxyServer) UseListener(ln net.Listener) *CtrlProxyServer {
+	s.injected = ln
+	return s
 }
 
 func (s *CtrlProxyServer) ListenPacket() (net.PacketConn, error) {

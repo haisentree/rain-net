@@ -45,6 +45,8 @@ type AdminServer struct {
 	ctrls    []*starhandler.CtrlProxyServer
 
 	started time.Time
+
+	injected net.Listener // 外部注入的监听器(嗅探分发),非 nil 时优先
 }
 
 var _ pluginer.Server = (*AdminServer)(nil)
@@ -64,7 +66,16 @@ func NewAdminServer(name string, listener *ListenerList, hub *starhandler.CtrlHu
 }
 
 func (s *AdminServer) Listen() (net.Listener, error) {
+	if s.injected != nil {
+		return s.injected, nil
+	}
 	return listenTCP(s.Addr, *s.settings)
+}
+
+// UseListener 注入外部监听器(嗅探分发等装配场景),优先于按地址自建
+func (s *AdminServer) UseListener(ln net.Listener) *AdminServer {
+	s.injected = ln
+	return s
 }
 
 func (s *AdminServer) ListenPacket() (net.PacketConn, error) {
