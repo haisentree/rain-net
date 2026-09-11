@@ -31,6 +31,9 @@ type Config struct {
 	HandlerMap  map[string]HandlerList
 	DailerMap   map[string]DailerList
 
+	// Routes 由新 schema routes 按 dialer 展开而来的 connect 规则(非 YAML 字段)
+	Routes []ConnectItem
+
 	Plugin      []plugin.Plugin
 	PluginChain plugin.Handler
 	Registry    map[string]plugin.Handler

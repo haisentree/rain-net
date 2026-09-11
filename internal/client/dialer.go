@@ -1,4 +1,4 @@
-package starserver
+package client
 
 import (
 	"crypto/tls"

@@ -6,11 +6,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/haisentree/rain-net/internal/handler/star"
+	"github.com/haisentree/rain-net/config"
+	starhandler "github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/internal/transport"
 	"github.com/haisentree/rain-net/pluginer"
-
-	"gopkg.in/yaml.v3"
 )
 
 const serverType = "star"
@@ -35,38 +34,117 @@ func newDefaultInput() pluginer.Input {
 	}
 }
 
-// 初始化特定服务的Config
+// newContext 解析配置(新 schema,经 config.Load)并映射为运行时组件参数。
+// 映射规则(R3-4d,过渡形态,4e 收口):
+//   - ingress.handler == "star"  → ctrlproxy(隧道服务端),credentials 展开为 clientProxy 清单
+//   - ingress.handler == "admin" → admin
+//   - ingress.handler == ""      → proxy(连接泵,由 routes 驱动)
+//   - 其他 handler 名             → 插件链帧服务(handlers[] 定义插件序列)
+//   - routes 按拨号器定义展开为 connect 规则(星型拨号器:to→identity)
 func newContext(i *pluginer.Instance) pluginer.Context {
 	data, err := os.ReadFile(newDefaultInput().Path())
 	if err != nil {
 		panic(err)
 	}
 
-	var config Config
-	err = yaml.Unmarshal(data, &config)
+	root, err := config.Load(data)
 	if err != nil {
 		panic(err)
 	}
 
-	config.ListenerMap = make(map[string]*ListenerList, len(config.ListenerList))
-	config.HandlerMap = make(map[string]HandlerList, len(config.HandlerList))
-	config.DailerMap = make(map[string]DailerList, len(config.DailerList))
-
-	// 监听器以指针入表:admin 等组件对 settings 的运行时修改全局可见
-	for i := range config.ListenerList {
-		config.ListenerMap[config.ListenerList[i].Name] = &config.ListenerList[i]
-	}
-	for _, val := range config.HandlerList {
-		config.HandlerMap[val.Name] = val
-	}
-	for _, val := range config.DailerList {
-		config.DailerMap[val.Name] = val
-	}
-
 	return &starContext{
-		Configs:       &config,
+		Configs:       buildRuntimeConfig(root),
 		ZoneToConfigs: make(map[string]*Config),
 	}
+}
+
+var _ pluginer.Context = &starContext{}
+
+// buildRuntimeConfig 新 schema → 运行时组件参数(旧内部形态,4e 收口后退役)
+func buildRuntimeConfig(root *config.Root) *Config {
+	cfg := &Config{
+		ListenerMap: make(map[string]*ListenerList),
+		HandlerMap:  make(map[string]HandlerList),
+		DailerMap:   make(map[string]DailerList),
+	}
+
+	for _, h := range root.Handlers {
+		cfg.HandlerMap[h.Name] = HandlerList{Name: h.Name, Plugins: h.Plugins}
+		cfg.HandlerList = append(cfg.HandlerList, HandlerList{Name: h.Name, Plugins: h.Plugins})
+	}
+
+	dialerByName := make(map[string]config.DialerSpec, len(root.Dialers))
+	for _, d := range root.Dialers {
+		dialerByName[d.Name] = d
+	}
+
+	for _, svc := range root.Services {
+		s := Service{Name: svc.Name, Type: serverType}
+		for _, ing := range svc.Ingress {
+			tr := ing.Transport
+			if tr == "" {
+				tr = "tcp"
+			}
+			ll := ListenerList{
+				Name:      ing.Name,
+				Transport: tr,
+				Addr:      ing.Addr,
+				Settings: Settings{
+					AdminPassword: ing.Settings.AdminPassword,
+					KeyPassword:   ing.Settings.KeyPassword,
+					CertFile:      ing.Settings.CertFile,
+					KeyFile:       ing.Settings.KeyFile,
+					Target:        ing.Settings.Target,
+					InCodec:       ing.Settings.InCodec,
+				},
+			}
+			switch ing.Handler {
+			case "star":
+				ll.Type = "ctrlproxy"
+				for _, cred := range ing.Settings.Credentials {
+					for _, stream := range cred.Streams {
+						ll.Settings.ClientProxy = append(ll.Settings.ClientProxy, ClientProxy{
+							ClientProxyName: cred.Name,
+							StreamId:        stream,
+							KeyPassword:     cred.KeyPassword,
+						})
+					}
+				}
+			case "admin":
+				ll.Type = "admin"
+			case "":
+				// 空处理器 = 连接泵代理,路由按 ingress 名匹配
+				ll.Type = "proxy"
+				ll.Settings.ProxyName = ing.Name
+			default:
+				ll.Type = "tcp"
+			}
+			cfg.ListenerList = append(cfg.ListenerList, ll)
+			cfg.ListenerMap[ll.Name] = &cfg.ListenerList[len(cfg.ListenerList)-1]
+			s.Listeners = append(s.Listeners, Listeners{ListenerName: ing.Name, HandlerName: ing.Handler})
+		}
+		cfg.Service = append(cfg.Service, s)
+	}
+
+	// routes 按拨号器定义展开为 connect 规则(星型拨号器:to → identity)
+	for _, rt := range root.Routes {
+		d, ok := dialerByName[rt.To]
+		if !ok || d.Type != "star" {
+			continue // direct 出站接入在 4e dialer/star 落地后统一
+		}
+		if len(rt.Streams) == 0 {
+			cfg.Routes = append(cfg.Routes, ConnectItem{
+				ProxyName: rt.Ingress, ClientProxyName: d.Identity,
+			})
+			continue
+		}
+		for _, stream := range rt.Streams {
+			cfg.Routes = append(cfg.Routes, ConnectItem{
+				ProxyName: rt.Ingress, ClientProxyName: d.Identity, StreamId: stream,
+			})
+		}
+	}
+	return cfg
 }
 
 var _ pluginer.Context = &starContext{}
@@ -144,11 +222,8 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 
 	// 路由规则表:配置文件静态规则做种子,运行时可经 admin API 动态增删
 	connectTable := NewConnectTable()
-	var staticRules []ConnectItem
-	for _, l := range h.Configs.ListenerList {
-		staticRules = append(staticRules, l.Settings.Connect...)
-	}
-	connectTable.Seed(staticRules)
+	// 路由种子:newContext 已把新 schema routes 按 dialer 展开为 connect 规则
+	connectTable.Seed(h.Configs.Routes)
 
 	var ctrls []*starhandler.CtrlProxyServer
 	var adminListeners []*ListenerList

@@ -1,11 +1,12 @@
-package starserver
+package client
 
 import (
 	"net"
 	"testing"
 	"time"
 
-	"github.com/haisentree/rain-net/internal/handler/star"
+	"github.com/haisentree/rain-net/config"
+	starhandler "github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/protocol/star"
 )
 
@@ -24,12 +25,12 @@ func waitFor(t *testing.T, timeout time.Duration, what string, cond func() bool)
 
 func TestDailerReconnect(t *testing.T) {
 	hub := starhandler.NewCtrlHub()
-	ctrl := starhandler.NewCtrlProxyServer("svc", &ListenerList{
+	ctrl := starhandler.NewCtrlProxyServer("svc", &config.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Addr:      "127.0.0.1:0",
-		Settings: Settings{
-			ClientProxy: []ClientProxy{
+		Settings: config.Settings{
+			ClientProxy: []config.ClientProxy{
 				{ClientProxyName: "clientProxy-0", KeyPassword: "pwd-0"},
 			},
 		},

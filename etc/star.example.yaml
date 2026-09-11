@@ -1,145 +1,77 @@
+# rain-net 新 schema 示例(design.md §三)
+# 协议 × 传输正交:ingress 声明接入点(transport 可换 tcp/tls/ws/h2/quic),
+# handlers 声明协议插件链,dialers 声明出站,routes 按声明顺序首中即停。
+#
+# 旧 schema(listenerList/dailerList/handlerList)已废弃:启动时检测到即报错并给出迁移对照。
+
 service:
   - name: test-1
+    ingress:
+      # 反向代理数据面入口:空 handler = 连接泵代理,由 routes 驱动
+      - name: proxy-in
+        transport: tcp
+        addr: 0.0.0.0:8085
+
+      # 隧道服务端(ctrl 控制通道):handler star
+      - name: star-in
+        transport: tls
+        addr: 0.0.0.0:5172
+        handler: star
+        settings:
+          credentials:                # 客户端凭据表:keyPassword 即接入凭据
+            - name: clientProxy-0
+              keyPassword: pwd-client-0
+              streams: [dailer-0-stream-1, dailer-0-stream-2]
+            - name: clientProxy-1
+              keyPassword: pwd-client-1
+              streams: [dailer-1-stream-1]
+
+      # 管理面:admin API + 内嵌 Web 管理台
+      - name: admin-in
+        transport: tcp
+        addr: 127.0.0.1:5173
+        handler: admin
+        settings:
+          adminPassword: admin-secret # 未配置时接口拒绝一切请求
+
+      # 正向代理示例(插件链):httpProxy + socks5
+      - name: forward-in
+        transport: tcp
+        addr: 0.0.0.0:5170
+        handler: proxy-chain
+
+handlers:
+  - name: proxy-chain
+    plugins: [httpProxy, socks5]
+
+dialers:
+  # 隧道出站:rainc 以 -name 领取一个 dialer 定义运行
+  - name: office-0
     type: star
-    listeners:    # 监听服务+handle
-      # - listenerName: listener-0
-      #   handlerName: handler-0
-
-      # - listenerName: listener-1
-      #   handlerName: handler-1
-
-      - listenerName: listener-3   # proxy 数据面入口
-        handlerName: handler-3
-
-      - listenerName: listener-4   # ctrlproxy 控制通道
-        handlerName: handler-2
-
-      - listenerName: listener-5   # admin 管理 API
-        handlerName: handler-4
-    dailers: # 暂时不绑定handle
-      - dailer-0
-      - dailer-1
-
-# TODO:IO密集型场景使用单线程+事件消息模型进行处理,对比性能
-listenerList:
-  - name: listener-0
-    type: tcp
-    transport: tcp
-    addr: 0.0.0.0:5170
-
-  - name: listener-1
-    type: tcp
-    transport: tcp
-    addr: 0.0.0.0:5171
-
-  - name: listener-2
-    type: tcp
-    addr: 0.0.0.0:8086
-
-  - name: listener-3
-    type: proxy         # 代理功能,可以通过bridger与当前主机其他的listener建立通道
-    transport: tcp
-    # transport: kcp、http2
-    addr: 0.0.0.0:8085
-    settings:
-      proxyName: listener-proxy-0   # 匹配 connect.proxyName
-      bridger: bridger-0
-
-  - name: listener-4
-    type: ctrlproxy
-    transport: tcp
-    addr: 0.0.0.0:5172
-    settings:
-      ctrlProxyName: ctrlproxy-name-0
-      tls: true                     # ctrl 通道 TLS 加密
-      certFile: etc/certs/server.crt
-      keyFile: etc/certs/server.key
-      # keyPassword: admin-pwd      # 可选管理员密码,注册不限 clientProxyName
-
-      connect:                      # proxy 监听器的路由规则,多条目标间 round-robin
-        - proxyName: listener-proxy-0
-          bridgeName: bridger-0     # bridger 暂未实现,当前同进程经 hub 直连
-          clientProxyName: clientProxy-0
-          streamId: dailer-0-stream-1
-
-        - proxyName: listener-proxy-0
-          bridgeName: bridger-0
-          clientProxyName: clientProxy-1
-          streamId: dailer-1-stream-1
-
-      clientProxy:                  # 客户端清单:keyPassword 即各客户端的接入凭据
-        - clientProxyName: clientProxy-0
-          streamId: dailer-0-stream-1  # 把客户端的流注册到
-          addr: 127.0.0.1:9991        # clientProxy代理的服务
-          transport: tcp
-          keyPassword: pwd-client-0
-
-        - clientProxyName: clientProxy-0
-          streamId: dailer-0-stream-2  # 把客户端的流注册到
-          addr: 127.0.0.1:9992        # clientProxy代理的服务
-          transport: tcp
-          keyPassword: pwd-client-0
-
-        - clientProxyName: clientProxy-1
-          streamId: dailer-1-stream-1  # 把客户端的流注册到
-          addr: 127.0.0.1:9993        # clientProxy代理的服务
-          transport: tcp
-          keyPassword: pwd-client-1
-
-  - name: listener-5
-    type: admin                     # 管理 API:运行时查询与配置,见 docs/admin-api.md
-    transport: tcp
-    addr: 127.0.0.1:5173
-    settings:
-      adminPassword: admin-secret   # 未配置时接口拒绝一切请求
-
-
-handlerList:
-  - name: handler-0
-    plugins:
-      - httpProxy
-      - socks5
-
-  - name: handler-1
-    plugins:
-      - socks5
-      - httpProxy
-
-  - name: handler-2
-    plugins:
-      - printer
-
-  - name: handler-3
-    plugins: []   # proxy 监听器不使用插件链
-
-  - name: handler-4
-    plugins: []   # admin 监听器不使用插件链
-
-# 管理 API 的使用见 docs/admin-api.md
-
-# 废弃:后期单独开启一个流,进行控制和下发配置信息
-# 校验密码连接后,服务端主动创建一个流后传递配置,再连接流通道
-dailerList:
-  - name: dailer-0
-    type: clientProxy
-    transport: tcp
-    addr: 127.0.0.1:5172 # ctrl 控制通道地址
-    clientProxyName: clientProxy-0
-    keyPassword: pwd-client-0
-    tls: true            # 与服务端建立 TLS 隧道
-    tlsSkipVerify: true  # 自签名证书场景跳过校验
-
-  - name: dailer-1
-    type: clientProxy
-    transport: tcp
+    transport: tls
     addr: 127.0.0.1:5172
-    clientProxyName: clientProxy-1
+    identity: clientProxy-0
+    keyPassword: pwd-client-0
+    locals:                           # stream → 本地内网服务
+      - stream: dailer-0-stream-1
+        addr: 127.0.0.1:9991
+      - stream: dailer-0-stream-2
+        addr: 127.0.0.1:9992
+
+  - name: office-1
+    type: star
+    transport: tls
+    addr: 127.0.0.1:5172
+    identity: clientProxy-1
     keyPassword: pwd-client-1
-    tls: true
-    tlsSkipVerify: true
+    locals:
+      - stream: dailer-1-stream-1
+        addr: 127.0.0.1:9993
 
-# bridger用户进程间网络通讯
-bridgerList:
-  - name: bridger-0
-
-# 配置中心 configCenter
+routes:                               # 声明顺序即优先级,首中即停;多条 streams 间 round-robin
+  - ingress: proxy-in
+    to: office-0
+    streams: [dailer-0-stream-1]
+  - ingress: proxy-in
+    to: office-1
+    streams: [dailer-1-stream-1]
