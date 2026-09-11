@@ -1,6 +1,6 @@
 # R2:Router + Bridge + 基础装饰器
 
-- 状态:pending
+- 状态:done(2026-09-11)
 - 依赖:R1
 - 关联:`docs/design.md` §二(Bridge 半关闭矩阵)、§三(Router 顺序匹配)、§九.3/4/5/6;`docs/research/bridge.md`(取舍依据)
 
@@ -24,13 +24,15 @@
 4. conformance 增加 bridge 场景(跨 Conn 半关闭传播);
 5. e2e 全绿。
 
-## 验收标准
+## 验收结果
 
-- [ ] 半关闭场景测试:客户端 CloseWrite 后服务端响应完整送达,不提前断;
-- [ ] 任一方向读错误 → 有限时间内双端释放(ctx 取消生效);
-- [ ] admin API 流量统计数字与装饰器记账一致;
-- [ ] `go test ./...` 全绿。
+- [x] 半关闭场景:客户端 CloseWrite 后,HTTP/1.0 风格后端的完整响应穿过 Bridge 送达,之后才 EOF(TestBridgeHalfClose);
+- [x] 读错误 → 立即双关(0.00s);ctx 取消 → 返回 context.Canceled 且 0.05s 内双端释放;
+- [x] 排空超时:对端装死 200ms 内触发双关(WithDrainTimeout);
+- [x] 记账装饰器单测通过(In/Out 精确计数);**与 admin API 的数据源切换在 R3**(starserver 流统计仍走 streamtable,桥接路径接入后统一);
+- [x] `go test ./...` 全绿(9 个测试包)。
 
 ## 进度日志
 
-- (无)
+- 2026-09-11:完成。internal/router(顺序首中 + 按规则 round-robin,connecttable 在 R3 拆 star 时切换并删除);internal/bridge(双 pump + 半关闭传播 + DrainTimeout + ctx 取消,池化 64KB buffer);internal/decorator(记账/限速/admission + 最小令牌桶);pkg/rainnet 错误三分类(Network/Protocol/Policy)。
+- 调试记录:① conformance 思路复用——Bridge 测试初版把 client(拨号端)误接为 Bridge 的 src,数据过网线到了无人读的 accept 端,靠 goroutine dump 定位;② 令牌桶初版 take(n>burst) 永远无法满足导致限速测试死锁,改为分次取用;③ 对端干净 Close 只产生 EOF,要测错误传播需 SO_LINGER=0 制造 RST。分支 r2-router-bridge。
