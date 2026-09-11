@@ -2,8 +2,23 @@ package starserver
 
 import (
 	"fmt"
+
+	"github.com/haisentree/rain-net/config"
 	"github.com/haisentree/rain-net/internal/star/plugin"
 	"github.com/haisentree/rain-net/pluginer"
+)
+
+// 配置模型类型定义在 config 包(纯 YAML schema),此处以别名引用,
+// 保持包内既有代码与测试的引用方式稳定;字段级重命名随新 schema 切换一并处理。
+type (
+	Service      = config.Service
+	Listeners    = config.Listeners
+	ListenerList = config.ListenerList
+	HandlerList  = config.HandlerList
+	DailerList   = config.DailerList
+	Settings     = config.Settings
+	ConnectItem  = config.ConnectItem
+	ClientProxy  = config.ClientProxy
 )
 
 type Config struct {
@@ -19,75 +34,6 @@ type Config struct {
 	Plugin      []plugin.Plugin
 	PluginChain plugin.Handler
 	Registry    map[string]plugin.Handler
-}
-
-type Service struct {
-	Name      string      `yaml:"name"`
-	Type      string      `yaml:"type"`
-	Listeners []Listeners `yaml:"listeners"`
-	Dailers   []string    `yaml:"dailers"`
-}
-
-type ListenerList struct {
-	Name      string `yaml:"name"`
-	Type      string `yaml:"type"`
-	Transport string `yaml:"transport,omitempty"`
-	Addr      string `yaml:"addr"`
-
-	Settings Settings `yaml:"settings"`
-}
-type DailerList struct {
-	Name            string `yaml:"name"`
-	Type            string `yaml:"type"`
-	Transport       string `yaml:"transport,omitempty"`
-	Addr            string `yaml:"addr"`
-	ClientProxyName string `yaml:"clientProxyName"`
-	KeyPassword     string `yaml:"keyPassword"`
-	TLS             bool   `yaml:"tls,omitempty"`           // 与 ctrl 通道建立 TLS 连接
-	TLSSkipVerify   bool   `yaml:"tlsSkipVerify,omitempty"` // 跳过服务端证书校验(自签名证书场景)
-}
-
-type Settings struct {
-	CtrlProxyName string `yaml:"ctrlProxyName,omitempty"`
-	ProxyName     string `yaml:"proxyName,omitempty"`     // proxy 监听器的逻辑代理名,用于匹配 connect 规则
-	KeyPassword   string `yaml:"keyPassword,omitempty"`   // ctrlproxy 管理员密码,注册不限 clientProxyName
-	AdminPassword string `yaml:"adminPassword,omitempty"` // admin 监听器的接口鉴权 token(Bearer)
-	TLS           bool   `yaml:"tls,omitempty"`           // 监听器启用 TLS
-	CertFile      string `yaml:"certFile,omitempty"`      // TLS 证书(tls: true 时必填)
-	KeyFile       string `yaml:"keyFile,omitempty"`       // TLS 私钥
-
-	// forward 插件:端口转发目标地址
-	Target string `yaml:"target,omitempty"`
-	// 入站协议转化(proxy 监听器):raw(默认)/ws,见 protocol/codec
-	InCodec string `yaml:"inCodec,omitempty"`
-
-	Connect     []ConnectItem `yaml:"connect,omitempty"`
-	ClientProxy []ClientProxy `yaml:"clientProxy,omitempty"`
-}
-
-type ConnectItem struct {
-	ProxyName       string `yaml:"proxyName" json:"proxyName"`
-	BridgeName      string `yaml:"bridgeName,omitempty" json:"bridgeName,omitempty"`
-	ClientProxyName string `yaml:"clientProxyName" json:"clientProxyName"`
-	StreamId        string `yaml:"streamId" json:"streamId"`
-}
-
-type ClientProxy struct {
-	ClientProxyName string `yaml:"clientProxyName" json:"clientProxyName"`
-	StreamId        string `yaml:"streamId" json:"streamId"`
-	Addr            string `yaml:"addr" json:"addr"`
-	Transport       string `yaml:"transport" json:"transport,omitempty"`
-	KeyPassword     string `yaml:"keyPassword,omitempty" json:"keyPassword,omitempty"`
-}
-
-type HandlerList struct {
-	Name    string   `yaml:"name"`
-	Plugins []string `yaml:"plugins"`
-}
-
-type Listeners struct {
-	ListenerName string `yaml:"listenerName"`
-	HandlerName  string `yaml:"handlerName"`
 }
 
 func (c *Config) AddPlugin(m plugin.Plugin) {

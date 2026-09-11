@@ -16,17 +16,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// starclient 客户端(dailer):拨号到 ctrlproxy 监听器,握手认证 + 流注册
+// rainc 客户端(dailer):拨号到 ctrlproxy 监听器,握手认证 + 流注册
 // + 保活,断线自动重连,并把外部连接转发到内网服务
 //
 // 两种用法:
 //
 //  1. 配置文件模式(推荐,与服务端共用 etc/star.example.yaml):
-//     go run ./cmd/starclient -config etc/star.example.yaml -name dailer-0
+//     go run ./cmd/rainc -config etc/star.example.yaml -name dailer-0
 //     从 dailerList 取地址/密码/TLS,从 clientProxy 取内网服务地址
 //
 //  2. 手工模式(仅控制面,不转发数据):
-//     go run ./cmd/starclient -addr 127.0.0.1:5172 -password xxx \
+//     go run ./cmd/rainc -addr 127.0.0.1:5172 -password xxx \
 //     -streams clientProxy-0:dailer-0-stream-1
 func main() {
 	var (

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/internal/star/starserver"
 	"github.com/haisentree/rain-net/protocol/star"
 )
@@ -53,10 +54,10 @@ func TestConnectTable(t *testing.T) {
 func TestAdminAPI(t *testing.T) {
 	backend := startCloseAfterReplyServer(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok")
 
-	hub := starserver.NewCtrlHub()
+	hub := starhandler.NewCtrlHub()
 	connectTable := starserver.NewConnectTable()
 
-	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
+	ctrl := starhandler.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Settings:  starserver.Settings{}, // 初始无任何凭据,全部经 admin API 动态发放
@@ -86,7 +87,7 @@ func TestAdminAPI(t *testing.T) {
 	admin := starserver.NewAdminServer("admin", &starserver.ListenerList{
 		Addr:     "127.0.0.1:0",
 		Settings: starserver.Settings{AdminPassword: "secret"},
-	}, hub, connectTable, []*starserver.CtrlProxyServer{ctrl})
+	}, hub, connectTable, []*starhandler.CtrlProxyServer{ctrl})
 	adminLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("admin listen: %v", err)
@@ -175,7 +176,7 @@ func TestAdminAPI(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("streams = %d", code)
 	}
-	var streams []starserver.StreamStat
+	var streams []starhandler.StreamStat
 	if err := json.Unmarshal([]byte(body), &streams); err != nil {
 		t.Fatalf("decode streams: %v", err)
 	}

@@ -1,4 +1,4 @@
-package starserver
+package starhandler
 
 import (
 	"net"

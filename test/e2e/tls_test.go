@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/internal/star/starserver"
 	"github.com/haisentree/rain-net/protocol/star"
 )
@@ -62,8 +63,8 @@ func genSelfSignedCert(t *testing.T) (certFile, keyFile string) {
 func TestCtrlTLS(t *testing.T) {
 	certFile, keyFile := genSelfSignedCert(t)
 
-	hub := starserver.NewCtrlHub()
-	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
+	hub := starhandler.NewCtrlHub()
+	ctrl := starhandler.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Settings: starserver.Settings{

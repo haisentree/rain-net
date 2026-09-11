@@ -5,12 +5,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/protocol/star"
 )
 
+// waitFor 轮询等待条件成立,超时则失败
+func waitFor(t *testing.T, timeout time.Duration, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timeout waiting: %s", what)
+}
+
 func TestDailerReconnect(t *testing.T) {
-	hub := NewCtrlHub()
-	ctrl := NewCtrlProxyServer("svc", &ListenerList{
+	hub := starhandler.NewCtrlHub()
+	ctrl := starhandler.NewCtrlProxyServer("svc", &ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
 		Addr:      "127.0.0.1:0",

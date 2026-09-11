@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/pluginer"
 )
 
@@ -36,16 +37,16 @@ type AdminServer struct {
 
 	settings *Settings
 
-	hub      *CtrlHub
+	hub      *starhandler.CtrlHub
 	connects *ConnectTable
-	ctrls    []*CtrlProxyServer
+	ctrls    []*starhandler.CtrlProxyServer
 
 	started time.Time
 }
 
 var _ pluginer.Server = (*AdminServer)(nil)
 
-func NewAdminServer(name string, listener *ListenerList, hub *CtrlHub, connects *ConnectTable, ctrls []*CtrlProxyServer) *AdminServer {
+func NewAdminServer(name string, listener *ListenerList, hub *starhandler.CtrlHub, connects *ConnectTable, ctrls []*starhandler.CtrlProxyServer) *AdminServer {
 	return &AdminServer{
 		Name: name,
 		Net:  listener.Transport,
@@ -174,12 +175,12 @@ func (s *AdminServer) countClients() int {
 }
 
 func (s *AdminServer) handleClients(w http.ResponseWriter, r *http.Request) {
-	var clients []ClientInfo
+	var clients []starhandler.ClientInfo
 	for _, c := range s.ctrls {
 		clients = append(clients, c.Clients()...)
 	}
 	if clients == nil {
-		clients = []ClientInfo{}
+		clients = []starhandler.ClientInfo{}
 	}
 	writeJSON(w, http.StatusOK, clients)
 }
