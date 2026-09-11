@@ -237,76 +237,58 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 		upDone       atomic.Bool
 		downDone     atomic.Bool
 	)
-	teardown := func() {
+	teardown := func(reason string) {
 		teardownOnce.Do(func() {
 			stop()
 			s.hub.CloseConn(e.ConnID, true)
 			mc.Close()
 		})
 	}
-	defer teardown()
+	defer teardown("handleConn exit")
 	bothFinished := func() {
 		if upDone.Load() && downDone.Load() {
-			teardown()
+			teardown("both directions finished")
 		}
 	}
 
-	// 下行泵:ctrl 通道 -> 外部连接(按入站协议编码)
+	// 下行泵:ctrl 通道 -> 外部连接(按入站协议编码)。
+	// RemoteClosed(客户端内网写完)后:排空 → CloseWrite 外部 → 继续存活,
+	// 迟到的下行帧仍被转发,直到双向结束/出错才拆除(与 R2 Bridge 状态机同构)。
+	rc := e.RemoteClosed
 	go func() {
 		defer func() { stop() }()
 		for {
 			select {
 			case payload := <-e.Sink:
-				println("PUMP write:", string(payload))
 				if err := mc.WriteMessage(payload); err != nil {
-					teardown()
+					teardown("downlink write error")
 					return
 				}
 				e.ReleaseRecv(len(payload)) // 归还客户端发送额度(流控)
-			case <-e.RemoteClosed:
-				// 客户端内网侧写完:排空在途数据。
-				// 读循环与 markRemoteClosed 并发,静默窗口兜住在途帧(50ms 无新数据才收尾)
-				quiet := false
+			case <-rc:
+				// 后端写完:排空在途 → 对外部 CloseWrite(EOF)→ downDone
 				for {
 					select {
 					case payload := <-e.Sink:
 						if err := mc.WriteMessage(payload); err != nil {
-							teardown()
+							teardown("drain write error")
 							return
 						}
 						e.ReleaseRecv(len(payload))
-						quiet = false
 					default:
-						if quiet {
-							downDone.Store(true)
-							// 支持半关闭则只关外部写侧;宽限窗口继续消费迟到的下行帧
-							// (后端应答穿越客户端往返需要额外时间),随后整条拆除
-							if cw, ok := mc.(interface{ CloseWrite() error }); ok && cw.CloseWrite() == nil {
-								bothFinished()
-								deadline := time.Now().Add(100 * time.Millisecond)
-								for time.Now().Before(deadline) {
-									select {
-									case payload := <-e.Sink:
-										if werr := mc.WriteMessage(payload); werr != nil {
-											teardown()
-											return
-										}
-										e.ReleaseRecv(len(payload))
-									case <-time.After(20 * time.Millisecond):
-									}
-								}
-								teardown()
-								return
-							}
-							teardown()
-							return
+						downDone.Store(true)
+						// 支持半关闭则只关外部写侧;泵继续存活——
+						// 后端应答可能仍在"客户端往返"路上,迟到的下行帧照常转发;
+						// 整条拆除交给上行结束(外部关闭/错误)或 e.Done
+						if cw, ok := mc.(interface{ CloseWrite() error }); ok {
+							_ = cw.CloseWrite()
 						}
-						quiet = true
-						time.Sleep(20 * time.Millisecond)
+						bothFinished()
+						rc = nil
 					}
 				}
 			case <-e.Done:
-				teardown()
+				teardown("hub conn closed")
 				return
 			case <-done:
 				return

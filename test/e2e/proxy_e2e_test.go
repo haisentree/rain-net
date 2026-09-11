@@ -464,7 +464,8 @@ func startEOFReactiveServer(t *testing.T, reply string) string {
 // EOF 反应式后端应答 → 客户端发半关帧 → 代理排空后对外部半关闭 →
 // 外部用户收到完整应答 + EOF。修复前:上行 EOF 直接整条拆除,应答被丢弃。
 func TestProxyHalfCloseEndToEnd(t *testing.T) {
-	t.Skip("flaky: RemoteClosed 排空与后端在途应答存在竞态,待根治(见 docs/task/R8-productization.md 遗留);半关闭语义由 TestNodeChainDialIntranet 覆盖")
+	t.Skip("flaky(~1/6): 客户端会话 EOF 先于后端应答到达,代理提前拆除连接;根因与调查记录见 docs/task/R8-productization.md 遗留项。半关闭语义由 TestNodeChainDialIntranet 覆盖")
+
 	backend := startEOFReactiveServer(t, "eof-reactive-ok")
 
 	hub := starhandler.NewCtrlHub()
