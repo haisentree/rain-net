@@ -1,6 +1,6 @@
 # R3:star 拆解 + 新配置 schema + admin 聚合
 
-- 状态:in-progress(切片1 协议半关帧已合入 main,2026-09-11)
+- 状态:in-progress(切片1 协议半关帧、切片2 隧道端到端半关闭、切片3 StreamConn/StreamHub 适配器均已合入 main,2026-09-11)
 - 依赖:R2
 - 关联:`docs/design.md` §三(命名与目标 schema)、§五(迁移映射)、§九.2(半关帧);`docs/research/gost.md`;`docs/star-protocol.md`
 
@@ -40,4 +40,4 @@
 
 ## 进度日志
 
-- 2026-09-11:切片1(协议层)完成并合入 main——reserved 标志位 FlagHalfClose 区分 streamClose 半关/全关,IsHalfClose()/HalfClose(streamID) 辅助,旧对端降级兼容;协议测试覆盖全关/半关/未知标志透传;star-protocol.md 已同步。**下一步:切片2 = starStreamAdapter(用 CloseWrite→半关帧)+ conformance 增补 star 场景,然后按本文件交付物顺序推进拆包/schema/admin。**
+- 2026-09-11:切片2(隧道端到端半关闭)合入——CtrlClient 半关感知(半关帧→内网连接 CloseWrite、内网 EOF→半关帧),ProxyServer 生命周期重构为双方向独立收尾(与 R2 Bridge 同构);新增 e2e TestProxyHalfCloseEndToEnd(EOF 反应式后端穿透隧道)。切片3(StreamConn/StreamHub 适配器)合入——protocol/star/adapter.go,五场景测试。**下一步:切片4 = 拆包(internal/handler/star + internal/dialer/star + internal/client + cmd/{raind,rainc}),随后新 schema(§十.2 不兼容切换)、admin APIProvider 聚合、删除实验 cmd。**切片1 记录:——reserved 标志位 FlagHalfClose 区分 streamClose 半关/全关,IsHalfClose()/HalfClose(streamID) 辅助,旧对端降级兼容;协议测试覆盖全关/半关/未知标志透传;star-protocol.md 已同步。**下一步:切片2 = starStreamAdapter(用 CloseWrite→半关帧)+ conformance 增补 star 场景,然后按本文件交付物顺序推进拆包/schema/admin。**
