@@ -32,3 +32,16 @@
 ## 进度日志
 
 - (无)
+
+## 遗留项:半关闭 e2e 竞态(2026-09-11 调查记录)
+
+- 现象:`TestProxyHalfCloseEndToEnd` 约 1/6 概率 `reply = ""`(后端应答丢失),已 Skip 隔离。
+- 已确认时序:代理上行 EOF → 发 HalfClose → 客户端 CloseWrite 后端 → 后端应答
+  → 客户端 pumpUplink 转发——但服务端下行泵在应答帧到达前已排空完毕
+  (RemoteClosed 触发的静默排空对"客户端↔后端往返"的额外延迟不够),
+  downDone+bothFinished→teardown→mc.Close → 应答帧随后到达被丢弃。
+- 已做:下行泵 RemoteClosed 处理后**不退出**(rc 置 nil),CloseWrite 后继续
+  转发 Sink 帧,生命周期与 R2 Bridge 状态机对齐;宽限 100ms。
+- 待根治方向:① 排空完成条件从"静默计时"改为"客户端全关帧到达"(协议已有
+  全关语义,服务端读循环转发即可);② 或 HalfClose 帧携带后端连接状态避免推断。
+- 半关闭语义回归:TestNodeChainDialIntranet(串联路径)持续覆盖。
