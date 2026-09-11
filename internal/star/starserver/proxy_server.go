@@ -279,9 +279,23 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 					default:
 						if quiet {
 							downDone.Store(true)
-							// 支持半关闭则只关外部写侧,外部仍可继续上行;否则降级整条关闭
+							// 支持半关闭则只关外部写侧;宽限窗口继续消费迟到的下行帧
+							// (后端应答穿越客户端往返需要额外时间),随后整条拆除
 							if cw, ok := mc.(interface{ CloseWrite() error }); ok && cw.CloseWrite() == nil {
 								bothFinished()
+								deadline := time.Now().Add(100 * time.Millisecond)
+								for time.Now().Before(deadline) {
+									select {
+									case payload := <-e.Sink:
+										if werr := mc.WriteMessage(payload); werr != nil {
+											teardown()
+											return
+										}
+										e.ReleaseRecv(len(payload))
+									case <-time.After(20 * time.Millisecond):
+									}
+								}
+								teardown()
 								return
 							}
 							teardown()
@@ -306,7 +320,6 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 	for {
 		payload, err := mc.ReadMessage()
 		if err != nil {
-			slog.Warn("DBG uplink read ended", "err", err, "isEOF", errors.Is(err, io.EOF))
 			if errors.Is(err, io.EOF) {
 				// 外部用户不再上行:半关帧通知客户端(内网连接关写),
 				// 本方向结束,等下行泵收尾

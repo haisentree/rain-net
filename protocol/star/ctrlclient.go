@@ -216,7 +216,6 @@ func (c *CtrlClient) Run() error {
 			// 半关 = 服务端不再上行,内网连接写侧关闭(排空语义由对端负责),
 			// 连接保留,上行泵继续;全关 = 整条终止。notify=false 避免回发关流帧
 			if msg.IsHalfClose() {
-				slog.Warn("DBG client: half close frame for conn", "conn", msg.StreamID)
 				c.halfCloseConn(msg.StreamID)
 			} else {
 				c.closeConn(msg.StreamID, false)
@@ -341,7 +340,6 @@ func (c *CtrlClient) pumpUplink(connID uint32, conn rainnet.Conn) {
 	buf := make([]byte, uplinkChunk)
 	for {
 		n, err := conn.Read(buf)
-		slog.Warn("DBG pumpUplink read", "conn", connID, "n", n, "err", err)
 		if n > 0 {
 			if win != nil {
 				if werr := win.Acquire(winCtx, int64(n)); werr != nil {
