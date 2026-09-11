@@ -10,8 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/haisentree/rain-net/config"
+	"github.com/haisentree/rain-net/internal/bridge"
+	"github.com/haisentree/rain-net/internal/client"
 	"github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/internal/transport"
+	"github.com/haisentree/rain-net/pkg/rainnet"
 	"github.com/haisentree/rain-net/pluginer"
 	"github.com/haisentree/rain-net/protocol/codec"
 	"github.com/haisentree/rain-net/protocol/star"
@@ -40,18 +44,36 @@ type ProxyServer struct {
 	settings Settings
 	hub      *starhandler.CtrlHub
 	rr       atomic.Uint32
+
+	// 出站链路(场景 C):本节点内嵌客户端,把连接经隧道推给远端节点落地
+	chainRoutes  []ChainRoute
+	chainSpecs   map[string]config.DialerSpec
+	chainDialers map[string]*client.Dialer
+	chainMu      sync.Mutex
+	chainRR      atomic.Uint32
+}
+
+// ProxyOption 代理监听器可选配置。
+type ProxyOption func(*ProxyServer)
+
+// WithChainRoutes 配置出站链路(design.md §六 场景 C:节点串联的网关侧)。
+func WithChainRoutes(routes []ChainRoute, specs map[string]config.DialerSpec) ProxyOption {
+	return func(p *ProxyServer) {
+		p.chainRoutes = routes
+		p.chainSpecs = specs
+	}
 }
 
 var _ pluginer.Server = (*ProxyServer)(nil)
 
-func NewProxyServer(serviceName string, listener *ListenerList, connects *ConnectTable, hub *starhandler.CtrlHub) (*ProxyServer, error) {
+func NewProxyServer(serviceName string, listener *ListenerList, connects *ConnectTable, hub *starhandler.CtrlHub, opts ...ProxyOption) (*ProxyServer, error) {
 	// 入站协议适配器:raw(默认)/ws,协议转化在这一层发生
 	c, err := codec.Get(listener.Settings.InCodec)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ProxyServer{
+	p := &ProxyServer{
 		Name: serviceName,
 		Net:  listener.Transport,
 		Addr: listener.Addr,
@@ -64,7 +86,11 @@ func NewProxyServer(serviceName string, listener *ListenerList, connects *Connec
 		settings:  listener.Settings,
 		hub:       hub,
 		inCodec:   c,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p, nil
 }
 
 // pickEntry round-robin 挑选一个当前可用的服务流
@@ -113,6 +139,35 @@ func (s *ProxyServer) ListenPacket() (net.PacketConn, error) {
 }
 
 func (s *ProxyServer) Serve(l net.Listener) error {
+	// 出站链路:内嵌客户端拨向远端节点并注册流(场景 C 网关侧)
+	s.chainMu.Lock()
+	for name, spec := range s.chainSpecs {
+		if _, running := s.chainDialers[name]; running {
+			continue
+		}
+		var streams []star.RegisterStreamReq
+		for _, cr := range s.chainRoutes {
+			if cr.Dialer != name {
+				continue
+			}
+			streams = append(streams, star.RegisterStreamReq{
+				ClientProxyName: cr.Identity, StreamId: cr.StreamId,
+			})
+		}
+		d := client.NewDialer(name, spec.Addr, spec.KeyPassword, streams)
+		d.TLS = spec.Transport == "tls"
+		d.TLSSkipVerify = true // 节点间自签名场景;生产可配 CA
+		d.LocalDialer = func(string) (net.Conn, error) {
+			return nil, errors.New("chain dialer does not serve local streams")
+		}
+		if s.chainDialers == nil {
+			s.chainDialers = make(map[string]*client.Dialer)
+		}
+		s.chainDialers[name] = d
+		go func() { _ = d.Run() }()
+	}
+	s.chainMu.Unlock()
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -128,6 +183,12 @@ func (s *ProxyServer) ServePacket(p net.PacketConn) error {
 }
 
 func (s *ProxyServer) handleConn(conn net.Conn) {
+	// 出站链路:连接经内嵌客户端的隧道推给远端节点落地(裸字节,见场景 C)
+	if len(s.chainRoutes) > 0 {
+		s.serveChain(conn)
+		return
+	}
+
 	// 入站协议适配:raw 直接包装,ws 等在此完成协议握手
 	mc, err := s.inCodec.Accept(conn)
 	if err != nil {
@@ -242,5 +303,61 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 		if e.Stream != nil {
 			e.Stream.InBytes.Add(uint64(len(payload)))
 		}
+	}
+}
+
+// pickChain round-robin 挑选出站链路路由,返回对应已启动的内嵌客户端。
+func (s *ProxyServer) pickChain() (ChainRoute, *client.Dialer) {
+	n := len(s.chainRoutes)
+	if n == 0 {
+		return ChainRoute{}, nil
+	}
+	cr := s.chainRoutes[s.chainRR.Add(1)%uint32(n)]
+	s.chainMu.Lock()
+	d := s.chainDialers[cr.Dialer]
+	s.chainMu.Unlock()
+	return cr, d
+}
+
+// serveChain 出站链路:用户连接 ↔ 隧道链路连接(远端落地),半关闭经 Bridge 传播。
+func (s *ProxyServer) serveChain(conn net.Conn) {
+	cr, d := s.pickChain()
+	if d == nil {
+		conn.Close()
+		return
+	}
+
+	// 等内嵌客户端会话建立(首次启动时拨号中)
+	deadline := time.Now().Add(10 * time.Second)
+	var cc *star.CtrlClient
+	for time.Now().Before(deadline) {
+		if cc = d.Client(); cc != nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if cc == nil {
+		slog.Warn("chain gateway: client session not ready", "dialer", cr.Dialer)
+		conn.Close()
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tconn, err := cc.DialIntranet(ctx, cr.Identity, cr.StreamId)
+	if err != nil {
+		slog.Warn("chain gateway dial intranet", "stream", cr.StreamId, "err", err)
+		conn.Close()
+		return
+	}
+	defer conn.Close()
+	defer tconn.Close()
+
+	slog.Info("chain gateway serving", "ingress", s.Name, "dialer", cr.Dialer, "stream", cr.StreamId,
+		"remote", conn.RemoteAddr())
+	if err := bridge.Bridge(context.Background(),
+		rainnet.Wrap(conn, rainnet.Meta{Listener: s.Name}),
+		rainnet.Wrap(tconn, rainnet.Meta{Identity: cr.Identity})); err != nil {
+		slog.Debug("chain bridge ended", "err", err)
 	}
 }
