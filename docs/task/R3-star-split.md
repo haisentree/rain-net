@@ -1,6 +1,6 @@
 # R3:star 拆解 + 新配置 schema + admin 聚合
 
-- 状态:pending
+- 状态:in-progress(切片1 协议半关帧已合入 main,2026-09-11)
 - 依赖:R2
 - 关联:`docs/design.md` §三(命名与目标 schema)、§五(迁移映射)、§九.2(半关帧);`docs/research/gost.md`;`docs/star-protocol.md`
 
@@ -40,4 +40,4 @@
 
 ## 进度日志
 
-- (无)
+- 2026-09-11:切片1(协议层)完成并合入 main——reserved 标志位 FlagHalfClose 区分 streamClose 半关/全关,IsHalfClose()/HalfClose(streamID) 辅助,旧对端降级兼容;协议测试覆盖全关/半关/未知标志透传;star-protocol.md 已同步。**下一步:切片2 = starStreamAdapter(用 CloseWrite→半关帧)+ conformance 增补 star 场景,然后按本文件交付物顺序推进拆包/schema/admin。**
