@@ -132,19 +132,19 @@ func TestAdminAPI(t *testing.T) {
 	}
 
 	// 2) 动态发放凭据 + 路由规则
-	if code, body = do("POST", "/api/clientProxies", starserver.ClientProxy{
+	if code, body = do("POST", "/api/tunnel/credentials", starserver.ClientProxy{
 		ClientProxyName: "cp-dyn", StreamId: "s-dyn",
 		Addr: backend, Transport: "tcp", KeyPassword: "dyn-pwd",
 	}, "secret"); code != http.StatusOK {
 		t.Fatalf("add clientProxy = %d, body %s", code, body)
 	}
 	// 重复添加冲突
-	if code, _ = do("POST", "/api/clientProxies", starserver.ClientProxy{
+	if code, _ = do("POST", "/api/tunnel/credentials", starserver.ClientProxy{
 		ClientProxyName: "cp-dyn", StreamId: "s-dyn", KeyPassword: "dyn-pwd",
 	}, "secret"); code != http.StatusConflict {
 		t.Fatalf("duplicate add = %d, want 409", code)
 	}
-	if code, body = do("POST", "/api/connects", starserver.ConnectItem{
+	if code, body = do("POST", "/api/tunnel/connects", starserver.ConnectItem{
 		ProxyName: "p0", ClientProxyName: "cp-dyn", StreamId: "s-dyn",
 	}, "secret"); code != http.StatusOK {
 		t.Fatalf("add connect = %d, body %s", code, body)
@@ -172,7 +172,7 @@ func TestAdminAPI(t *testing.T) {
 	}
 
 	// 4) 查询:流量统计已累计
-	code, body = do("GET", "/api/streams", nil, "secret")
+	code, body = do("GET", "/api/tunnel/streams", nil, "secret")
 	if code != http.StatusOK {
 		t.Fatalf("streams = %d", code)
 	}
@@ -185,7 +185,7 @@ func TestAdminAPI(t *testing.T) {
 	}
 
 	// 5) 删除路由规则后,新连接无流可用,快速失败
-	if code, _ = do("DELETE", "/api/connects/p0/cp-dyn/s-dyn", nil, "secret"); code != http.StatusOK {
+	if code, _ = do("DELETE", "/api/tunnel/connects/p0/cp-dyn/s-dyn", nil, "secret"); code != http.StatusOK {
 		t.Fatalf("delete connect = %d", code)
 	}
 	if _, err := proxyRequestErr(t, proxyLn.Addr().String()); err == nil {
@@ -193,7 +193,7 @@ func TestAdminAPI(t *testing.T) {
 	}
 
 	// 6) 踢下线:流被清理
-	if code, body = do("POST", "/api/kick", map[string]string{"clientProxyName": "cp-dyn"}, "secret"); code != http.StatusOK {
+	if code, body = do("POST", "/api/tunnel/kick", map[string]string{"clientProxyName": "cp-dyn"}, "secret"); code != http.StatusOK {
 		t.Fatalf("kick = %d, body %s", code, body)
 	}
 	waitFor(t, 3*time.Second, "kick cleanup", func() bool {
@@ -201,7 +201,7 @@ func TestAdminAPI(t *testing.T) {
 	})
 
 	// 7) 删除凭据后,原密码无法再认证
-	if code, _ = do("DELETE", "/api/clientProxies/cp-dyn/s-dyn", nil, "secret"); code != http.StatusOK {
+	if code, _ = do("DELETE", "/api/tunnel/credentials/cp-dyn/s-dyn", nil, "secret"); code != http.StatusOK {
 		t.Fatalf("delete clientProxy = %d", code)
 	}
 	if _, err := star.DialCtrl("tcp", ctrlLn.Addr().String(),
@@ -210,12 +210,12 @@ func TestAdminAPI(t *testing.T) {
 	}
 
 	// 8) 凭据列表接口:发放后再查询应可见
-	if code, _ = do("POST", "/api/clientProxies", starserver.ClientProxy{
+	if code, _ = do("POST", "/api/tunnel/credentials", starserver.ClientProxy{
 		ClientProxyName: "cp-list", StreamId: "s-list", KeyPassword: "pwd-list",
 	}, "secret"); code != http.StatusOK {
 		t.Fatalf("add clientProxy for list = %d", code)
 	}
-	code, body = do("GET", "/api/clientProxies", nil, "secret")
+	code, body = do("GET", "/api/tunnel/credentials", nil, "secret")
 	if code != http.StatusOK {
 		t.Fatalf("list clientProxies = %d", code)
 	}

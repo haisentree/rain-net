@@ -130,7 +130,7 @@ async function renderOverview() {
 }
 
 async function renderClients() {
-  const list = await api("/api/clients");
+  const list = await api("/api/tunnel/clients");
   const tb = $("#clientsTable tbody");
   if (!list.length) { tb.innerHTML = emptyRow(6, "暂无在线客户端"); return; }
   tb.innerHTML = list.map((c) => `
@@ -145,7 +145,7 @@ async function renderClients() {
 }
 
 async function renderStreams() {
-  const list = await api("/api/streams");
+  const list = await api("/api/tunnel/streams");
   const tb = $("#streamsTable tbody");
   if (!list.length) { tb.innerHTML = emptyRow(6, "暂无已注册流"); return; }
   tb.innerHTML = list.map((s) => `
@@ -160,7 +160,7 @@ async function renderStreams() {
 }
 
 async function renderConns() {
-  const list = await api("/api/conns");
+  const list = await api("/api/tunnel/conns");
   const tb = $("#connsTable tbody");
   if (!list.length) { tb.innerHTML = emptyRow(4, "暂无活跃连接"); return; }
   tb.innerHTML = list.map((c) => `
@@ -173,7 +173,7 @@ async function renderConns() {
 }
 
 async function renderRules() {
-  const groups = await api("/api/connects");
+  const groups = await api("/api/tunnel/connects");
   const box = $("#rulesBox");
   const names = Object.keys(groups);
   if (!names.length) { box.innerHTML = emptyRow(1, "暂无路由规则"); return; }
@@ -195,7 +195,7 @@ async function renderRules() {
 }
 
 async function renderCredentials() {
-  const list = await api("/api/clientProxies");
+  const list = await api("/api/tunnel/credentials");
   const tb = $("#credsTable tbody");
   if (!list.length) { tb.innerHTML = emptyRow(5, "暂无凭据,可在上方发放"); return; }
   tb.innerHTML = list.map((c) => `
@@ -218,7 +218,7 @@ document.addEventListener("click", async (e) => {
   if (kick) {
     if (!kick.dataset.kick) { toast("该客户端无身份,无法按身份踢下线", true); return; }
     try {
-      const r = await api("/api/kick", { method: "POST", body: { clientProxyName: kick.dataset.kick } });
+      const r = await api("/api/tunnel/kick", { method: "POST", body: { clientProxyName: kick.dataset.kick } });
       toast(`已踢下线 ${r.kicked} 个会话`);
       refresh();
     } catch (err) { toast(err.message, true); }
@@ -228,7 +228,7 @@ document.addEventListener("click", async (e) => {
   const delRule = e.target.closest("[data-delrule]");
   if (delRule) {
     try {
-      await api(`/api/connects/${encodeURIComponent(delRule.dataset.delrule)}/${encodeURIComponent(delRule.dataset.cp)}/${encodeURIComponent(delRule.dataset.sid)}`, { method: "DELETE" });
+      await api(`/api/tunnel/connects/${encodeURIComponent(delRule.dataset.delrule)}/${encodeURIComponent(delRule.dataset.cp)}/${encodeURIComponent(delRule.dataset.sid)}`, { method: "DELETE" });
       toast("路由规则已删除");
       refresh();
     } catch (err) { toast(err.message, true); }
@@ -241,7 +241,7 @@ document.addEventListener("click", async (e) => {
     const chk = document.querySelector(`.kick-chk[data-key="${CSS.escape(key)}"]`);
     const kickQ = chk && chk.checked ? "?kick=1" : "";
     try {
-      const r = await api(`/api/clientProxies/${encodeURIComponent(delCred.dataset.delcred)}/${encodeURIComponent(delCred.dataset.sid)}${kickQ}`, { method: "DELETE" });
+      const r = await api(`/api/tunnel/credentials/${encodeURIComponent(delCred.dataset.delcred)}/${encodeURIComponent(delCred.dataset.sid)}${kickQ}`, { method: "DELETE" });
       toast(r.kicked != null ? `已删除并踢下线 ${r.kicked} 个会话` : "凭据已删除");
       refresh();
     } catch (err) { toast(err.message, true); }
@@ -252,7 +252,7 @@ $("#ruleForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   try {
-    await api("/api/connects", {
+    await api("/api/tunnel/connects", {
       method: "POST",
       body: {
         proxyName: f.get("proxyName").trim(),
@@ -270,7 +270,7 @@ $("#credForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   try {
-    await api("/api/clientProxies", {
+    await api("/api/tunnel/credentials", {
       method: "POST",
       body: {
         clientProxyName: f.get("clientProxyName").trim(),

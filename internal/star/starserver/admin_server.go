@@ -18,16 +18,19 @@ import (
 //
 // 提供运行时查询与配置能力,鉴权为 Bearer token(settings.adminPassword):
 //
-//	GET    /api/status                                              总览
-//	GET    /api/clients                                             在线客户端
-//	GET    /api/streams                                             已注册流(含流量)
-//	GET    /api/conns                                               活跃连接
-//	GET    /api/connects                                            路由规则
-//	POST   /api/clientProxies                                       动态添加客户端凭据/流定义
-//	DELETE /api/clientProxies/{clientProxyName}/{streamId}          删除(?kick=1 同时踢下线)
-//	POST   /api/connects                                            动态添加路由规则
-//	DELETE /api/connects/{proxyName}/{clientProxyName}/{streamId}   删除路由规则
-//	POST   /api/kick                                                踢指定身份的客户端下线
+//	GET    /api/status                                                     总览
+//	GET    /api/tunnel/clients                                             在线客户端
+//	GET    /api/tunnel/streams                                             已注册流(含流量)
+//	GET    /api/tunnel/conns                                               活跃连接
+//	GET    /api/tunnel/connects                                            路由规则
+//	POST   /api/tunnel/credentials                                         动态发放客户端凭据/流定义
+//	DELETE /api/tunnel/credentials/{clientProxyName}/{streamId}            删除(?kick=1 同时踢下线)
+//	POST   /api/tunnel/connects                                            动态添加路由规则
+//	DELETE /api/tunnel/connects/{proxyName}/{clientProxyName}/{streamId}   删除路由规则
+//	POST   /api/tunnel/kick                                                踢指定身份的客户端下线
+//
+// APIProvider 聚合(docs/design.md §七):实现了 pluginer.APIProvider 的组件
+// 经 RegisterAPI 向 apiMux 注册自己的管理子路由,鉴权由本监听器统一处理。
 //
 // 注意:动态修改只作用于运行时,进程重启后以配置文件为准(持久化后续接入配置中心)
 type AdminServer struct {
@@ -71,16 +74,23 @@ func (s *AdminServer) ListenPacket() (net.PacketConn, error) {
 func (s *AdminServer) Serve(l net.Listener) error {
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("GET /api/status", s.handleStatus)
-	apiMux.HandleFunc("GET /api/clients", s.handleClients)
-	apiMux.HandleFunc("GET /api/streams", s.handleStreams)
-	apiMux.HandleFunc("GET /api/conns", s.handleConns)
-	apiMux.HandleFunc("GET /api/connects", s.handleConnects)
-	apiMux.HandleFunc("GET /api/clientProxies", s.handleListClientProxies)
-	apiMux.HandleFunc("POST /api/clientProxies", s.handleAddClientProxy)
-	apiMux.HandleFunc("DELETE /api/clientProxies/{clientProxyName}/{streamId}", s.handleDeleteClientProxy)
-	apiMux.HandleFunc("POST /api/connects", s.handleAddConnect)
-	apiMux.HandleFunc("DELETE /api/connects/{proxyName}/{clientProxyName}/{streamId}", s.handleDeleteConnect)
-	apiMux.HandleFunc("POST /api/kick", s.handleKick)
+	apiMux.HandleFunc("GET /api/tunnel/clients", s.handleClients)
+	apiMux.HandleFunc("GET /api/tunnel/streams", s.handleStreams)
+	apiMux.HandleFunc("GET /api/tunnel/conns", s.handleConns)
+	apiMux.HandleFunc("GET /api/tunnel/connects", s.handleConnects)
+	apiMux.HandleFunc("GET /api/tunnel/credentials", s.handleListClientProxies)
+	apiMux.HandleFunc("POST /api/tunnel/credentials", s.handleAddClientProxy)
+	apiMux.HandleFunc("DELETE /api/tunnel/credentials/{clientProxyName}/{streamId}", s.handleDeleteClientProxy)
+	apiMux.HandleFunc("POST /api/tunnel/connects", s.handleAddConnect)
+	apiMux.HandleFunc("DELETE /api/tunnel/connects/{proxyName}/{clientProxyName}/{streamId}", s.handleDeleteConnect)
+	apiMux.HandleFunc("POST /api/tunnel/kick", s.handleKick)
+
+	// APIProvider 聚合:组件自注册管理子路由(§七,组件自治、插件拔除零残留)
+	for _, c := range s.ctrls {
+		if ap, ok := any(c).(pluginer.APIProvider); ok {
+			ap.RegisterAPI(apiMux)
+		}
+	}
 
 	// 内嵌 Web 管理台:静态资源公开(页面无敏感数据),
 	// /api/* 统一走 Bearer 鉴权
