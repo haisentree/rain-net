@@ -82,6 +82,9 @@ type Transport interface {
     Dial(ctx context.Context, addr string) (net.Conn, error)
 }
 // 多路复用实现(h2/quic/star/ws)内部私有连接池,Dial 返回逻辑流,接口不变。
+// R1 实现微调:注册表按"工厂"注册(Build(name, Options) → Transport),
+// 因 tls 等传输需要证书等构建参数(Options 现含 CertFile/KeyFile/TLSSkipVerify);
+// Listen 的 ctx 契约:ctx 取消必须关闭 listener(实现经 transport.WatchClose 落实)。
 
 // internal/dialer
 type Dialer interface {

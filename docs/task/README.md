@@ -16,7 +16,7 @@
 | 编号 | 文件 | 目标 | 依赖 | 状态 |
 |------|------|------|------|------|
 | R0 | [R0-e2e-safety-net.md](R0-e2e-safety-net.md) | 迁移 e2e 到 test/e2e,建立重构安全网 | — | **done**(2026-09-11) |
-| R1 | [R1-core-abstraction.md](R1-core-abstraction.md) | pkg/rainnet + Transport 抽象 + 一致性套件(=M1) | R0 | pending |
+| R1 | [R1-core-abstraction.md](R1-core-abstraction.md) | pkg/rainnet + Transport 抽象 + 一致性套件(=M1) | R0 | **done**(2026-09-11) |
 | R2 | [R2-router-bridge.md](R2-router-bridge.md) | Router 迁移 + Bridge 半关闭契约 + 基础装饰器 | R1 | pending |
 | R3 | [R3-star-split.md](R3-star-split.md) | star 拆解 + 新配置 schema + admin 聚合 + 协议半关帧 | R2 | pending |
 | R4 | [R4-ws-transport.md](R4-ws-transport.md) | websocket transport(=M2) | R1 | pending |

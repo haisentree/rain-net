@@ -4,10 +4,12 @@ import (
 	"context"
 	"log/slog"
 	"net"
-	"github.com/haisentree/rain-net/internal/star/plugin"
-	"github.com/haisentree/rain-net/protocol/star"
 	"sync"
 	"time"
+
+	"github.com/haisentree/rain-net/internal/star/plugin"
+	"github.com/haisentree/rain-net/internal/transport"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 type Server struct {
@@ -23,18 +25,22 @@ type Server struct {
 
 	zones *Config
 	m     sync.Mutex
+
+	transportOpts transport.Options
 }
 
-func NewServer(serviceName, transport, addr string, config *Config) (*Server, error) {
+func NewServer(serviceName, transportName, addr string, config *Config, tOpts transport.Options) (*Server, error) {
 	server := &Server{
 		Name: serviceName,
-		Net:  transport,
+		Net:  transportName,
 		Addr: addr,
 
 		zones: config,
 
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 5 * time.Second,
+
+		transportOpts: tOpts,
 	}
 
 	if server.zones == nil {
@@ -87,15 +93,16 @@ func (s *Server) ServePacket(p net.PacketConn) (err error) {
 }
 
 func (s *Server) Listen() (net.Listener, error) {
-	if s.Net != "tcp" {
+	// udp 走 PacketConn 特例(ListenPacket):transport 层 v1 不建模 UDP 数据报
+	if s.Net == "udp" {
 		return nil, nil
 	}
-
-	l, err := net.Listen("tcp", s.Addr)
+	// 其余传输(tcp/tls/…)一律经 transport 注册表构建,装配层不再硬编码
+	tr, err := transport.Build(s.Net, s.transportOpts)
 	if err != nil {
 		return nil, err
 	}
-	return l, nil
+	return tr.Listen(context.Background(), s.Addr)
 }
 
 func (s *Server) ListenPacket() (net.PacketConn, error) {

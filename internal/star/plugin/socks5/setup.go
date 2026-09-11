@@ -1,11 +1,11 @@
 package socks5
 
 import (
-	"log"
-	"os"
 	"github.com/haisentree/rain-net/internal/star/plugin"
 	"github.com/haisentree/rain-net/internal/star/starserver"
 	"github.com/haisentree/rain-net/pluginer"
+	"log"
+	"os"
 )
 
 func init() {

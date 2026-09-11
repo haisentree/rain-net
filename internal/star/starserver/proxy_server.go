@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/haisentree/rain-net/protocol/codec"
 	"github.com/haisentree/rain-net/pluginer"
+	"github.com/haisentree/rain-net/protocol/codec"
 	"github.com/haisentree/rain-net/protocol/star"
 )
 

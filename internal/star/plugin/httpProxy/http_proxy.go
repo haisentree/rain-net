@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/haisentree/rain-net/internal/star/plugin"
+	"github.com/haisentree/rain-net/protocol/star"
 	"io"
 	"net"
 	"net/http"
-	"github.com/haisentree/rain-net/internal/star/plugin"
-	"github.com/haisentree/rain-net/protocol/star"
 	"time"
 )
 
