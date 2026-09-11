@@ -32,6 +32,12 @@ const (
 	MsgStreamClose       byte = 0x11 // 双向 流关闭
 	MsgPing              byte = 0x20 // 双向 保活探测
 	MsgPong              byte = 0x21 // 双向 保活应答
+
+	// 节点串联(R7):客户端主动请求在已注册流上建立一条到内网目标的连接。
+	// connID 由客户端分配,取高位命名空间(0x80000000 起),与服务端分配的
+	// 连接 ID(低位递增)天然不冲突。之后的 data/streamClose 帧同既有语义。
+	MsgClientConnReq byte = 0x30 // 客户端 → 服务端 请求建立连接
+	MsgClientConnAck byte = 0x31 // 服务端 → 客户端 应答
 )
 
 const (
@@ -142,6 +148,10 @@ func MsgTypeName(t byte) string {
 		return "ping"
 	case MsgPong:
 		return "pong"
+	case MsgClientConnReq:
+		return "clientConnReq"
+	case MsgClientConnAck:
+		return "clientConnAck"
 	default:
 		return fmt.Sprintf("unknown(0x%02x)", t)
 	}

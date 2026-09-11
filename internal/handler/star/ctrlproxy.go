@@ -1,12 +1,15 @@
 package starhandler
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/haisentree/rain-net/internal/bridge"
+	"github.com/haisentree/rain-net/pkg/rainnet"
 	"github.com/haisentree/rain-net/pluginer"
 	"github.com/haisentree/rain-net/protocol/star"
 )
@@ -228,6 +231,9 @@ func (s *CtrlProxyServer) handleConn(conn net.Conn) {
 	s.clients[sess] = info
 	s.clientsMu.Unlock()
 
+	// 节点串联(R7):客户端主动拨号建立的连接由 feed 投递帧
+	feed := star.NewStreamHub(sess)
+
 	defer func() {
 		s.clientsMu.Lock()
 		delete(s.clients, sess)
@@ -240,6 +246,7 @@ func (s *CtrlProxyServer) handleConn(conn net.Conn) {
 		if n := s.hub.Streams.RemoveByClient(sess); n > 0 {
 			slog.Info("ctrl client disconnected, removed streams", "client", req.ClientName, "count", n)
 		}
+		feed.SessionClosed(nil)
 		conn.Close()
 	}()
 
@@ -248,6 +255,13 @@ func (s *CtrlProxyServer) handleConn(conn net.Conn) {
 		if err != nil {
 			slog.Info("ctrl session end", "client", req.ClientName, "err", err)
 			return
+		}
+
+		// 节点串联连接的帧(数据/关流)由 feed 消费
+		if msg.Type == star.MsgData || msg.Type == star.MsgStreamClose {
+			if feed.Feed(msg) {
+				continue
+			}
 		}
 
 		switch msg.Type {
@@ -293,10 +307,76 @@ func (s *CtrlProxyServer) handleConn(conn net.Conn) {
 			} else {
 				slog.Debug("half close for unknown conn", "conn", msg.StreamID)
 			}
+		case star.MsgClientConnReq:
+			s.handleClientConnReq(sess, feed, identity, msg)
 		default:
 			slog.Debug("unexpected message", "type", msg.TypeName())
 		}
 	}
+}
+
+// handleClientConnReq 节点串联:客户端请求在其已注册流上建立一条连接,
+// 服务端按 clientProxy 配置的 addr 拨内网目标并与隧道流桥接。
+// 半关闭经 Bridge 传播:客户端关写 → 内网连接关写(EOF 反应式服务可用)。
+func (s *CtrlProxyServer) handleClientConnReq(sess *star.Session, feed *star.StreamHub, identity string, msg *star.Message) {
+	var creq star.ClientConnReq
+	if err := star.DecodeControl(msg, &creq); err != nil {
+		slog.Warn("bad clientConnReq", "err", err)
+		return
+	}
+
+	ack := star.ClientConnAck{ConnID: creq.ConnID}
+	fail := func(reason string) {
+		ack.Message = reason
+		_ = sess.SendControl(star.MsgClientConnAck, ack)
+		slog.Info("client conn refused", "conn", creq.ConnID, "reason", reason)
+	}
+
+	// 身份绑定:凭据只能拨自己名下的流(管理员不限)
+	if identity != "" && creq.ClientProxyName != identity {
+		fail(fmt.Sprintf("clientProxyName %q not allowed for this credential", creq.ClientProxyName))
+		return
+	}
+	// 流必须已由该客户端注册
+	if _, ok := s.hub.Streams.GetByName(creq.ClientProxyName, creq.StreamId); !ok {
+		fail(fmt.Sprintf("unknown stream %s/%s", creq.ClientProxyName, creq.StreamId))
+		return
+	}
+	// 目标地址:clientProxy 配置的 addr(服务端所在网络的内网目标)
+	target := ""
+	s.credMu.Lock()
+	for _, cp := range s.settings.ClientProxy {
+		if cp.ClientProxyName == creq.ClientProxyName && cp.StreamId == creq.StreamId {
+			target = cp.Addr
+			break
+		}
+	}
+	s.credMu.Unlock()
+	if target == "" {
+		fail("stream has no target address")
+		return
+	}
+
+	sc := feed.NewStreamConn(creq.ConnID)
+	if sc == nil {
+		fail("session closing")
+		return
+	}
+	_ = sess.SendControl(star.MsgClientConnAck, star.ClientConnAck{ConnID: creq.ConnID, OK: true})
+
+	go func() {
+		tconn, err := net.DialTimeout("tcp", target, 5*time.Second)
+		if err != nil {
+			slog.Warn("chain dial target", "target", target, "err", err)
+			sc.Close()
+			return
+		}
+		defer tconn.Close()
+		defer feed.Remove(creq.ConnID)
+		if err := bridge.Bridge(context.Background(), sc, rainnet.Wrap(tconn, rainnet.Meta{})); err != nil {
+			slog.Debug("chain bridge ended", "conn", creq.ConnID, "err", err)
+		}
+	}()
 }
 
 func identityOrAny(identity string) string {

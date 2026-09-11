@@ -49,3 +49,19 @@ func (w *response) Write(m []byte) (int, error) {
 		panic("dns: internal error: udp and tcp both nil")
 	}
 }
+
+// ClientConnReq 节点串联:客户端请求在已注册流上建立一条连接。
+// connID 由客户端分配(高位命名空间),服务端应答后,该连接的
+// data/streamClose 帧与既有连接同语义双向流动。
+type ClientConnReq struct {
+	ConnID          uint32 `json:"connId"`
+	ClientProxyName string `json:"clientProxyName"`
+	StreamId        string `json:"streamId"`
+}
+
+// ClientConnAck 节点串联应答。
+type ClientConnAck struct {
+	ConnID  uint32 `json:"connId"`
+	OK      bool   `json:"ok"`
+	Message string `json:"message,omitempty"`
+}
