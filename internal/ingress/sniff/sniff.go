@@ -132,10 +132,8 @@ func (d *Dispatcher) dispatch(conn net.Conn) {
 		return
 	}
 	replay := func() []byte {
-		out := make([]byte, 0, len(head)+rec.buf.Len())
-		out = append(out, head...)
-		out = append(out, rec.buf.Bytes()...)
-		return out
+		// rec.buf 已包含嗅探读走的全部字节(含初始 head),全量重放
+		return append([]byte{}, rec.buf.Bytes()...)
 	}
 
 	// 1) 前缀规则(配置优先)
