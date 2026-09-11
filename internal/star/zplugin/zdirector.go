@@ -10,6 +10,7 @@ import (
 	_ "github.com/haisentree/rain-net/internal/star/plugin/printer"
 	_ "github.com/haisentree/rain-net/internal/star/plugin/socks5"
 	_ "github.com/haisentree/rain-net/internal/transport/h2"
+	_ "github.com/haisentree/rain-net/internal/transport/kcp"
 	_ "github.com/haisentree/rain-net/internal/transport/quic"
 	_ "github.com/haisentree/rain-net/internal/transport/tcp"
 	_ "github.com/haisentree/rain-net/internal/transport/tls"
