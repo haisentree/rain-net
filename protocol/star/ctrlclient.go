@@ -1,6 +1,7 @@
 package star
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -31,7 +32,14 @@ type CtrlClient struct {
 	mu        sync.RWMutex
 	streams   map[string]uint32       // 配置里的字符串 streamId -> 服务端分配的数字流ID
 	streamIDs map[uint32]string       // 数字流ID -> 字符串 streamId
+	pairs     map[string]struct{}     // 已注册的 clientProxyName\x00streamId 身份对
 	conns     map[uint32]rainnet.Conn // 连接ID -> 内网服务连接(半关闭语义经 Conn 传播)
+
+	// 节点串联(R7):客户端主动拨号建立的连接(connID 高位命名空间)
+	dialMu    sync.Mutex
+	dialConns map[uint32]*StreamConn
+	dialAcks  map[uint32]chan ClientConnAck
+	dialSeq   uint32
 
 	// LocalDialer 服务端请求建立连接时,按 streamId 拨号内网服务
 	LocalDialer func(streamId string) (net.Conn, error)
@@ -76,7 +84,10 @@ func DialCtrlTLS(network, addr string, req HandshakeReq, streams []RegisterStrea
 		sess:      NewSession(conn),
 		streams:   make(map[string]uint32, len(streams)),
 		streamIDs: make(map[uint32]string, len(streams)),
+		pairs:     make(map[string]struct{}, len(streams)),
 		conns:     make(map[uint32]rainnet.Conn),
+		dialConns: make(map[uint32]*StreamConn),
+		dialAcks:  make(map[uint32]chan ClientConnAck),
 		closed:    make(chan struct{}),
 	}
 
@@ -102,6 +113,7 @@ func DialCtrlTLS(network, addr string, req HandshakeReq, streams []RegisterStrea
 		}
 		c.streams[st.StreamId] = rack.AssignID
 		c.streamIDs[rack.AssignID] = st.StreamId
+		c.pairs[st.ClientProxyName+"\x00"+st.StreamId] = struct{}{}
 	}
 
 	return c, nil
@@ -176,8 +188,17 @@ func (c *CtrlClient) Run() error {
 		case MsgConnOpen:
 			c.handleConnOpen(msg)
 		case MsgData:
+			if sc := c.dialConn(msg.StreamID); sc != nil {
+				sc.deliver(feedItem{data: msg.Payload})
+				continue
+			}
 			c.writeConn(msg.StreamID, msg.Payload)
 		case MsgStreamClose:
+			if sc := c.dialConn(msg.StreamID); sc != nil {
+				sc.deliver(feedItem{half: msg.IsHalfClose(), full: !msg.IsHalfClose()})
+				c.removeDialConn(msg.StreamID)
+				continue
+			}
 			// 半关 = 服务端不再上行,内网连接写侧关闭(排空语义由对端负责),
 			// 连接保留,上行泵继续;全关 = 整条终止。notify=false 避免回发关流帧
 			if msg.IsHalfClose() {
@@ -190,6 +211,19 @@ func (c *CtrlClient) Run() error {
 			if err := c.sess.Send(&Message{Type: MsgPong, StreamID: msg.StreamID, Payload: msg.Payload}); err != nil {
 				runErr = err
 				return err
+			}
+		case MsgClientConnAck:
+			var ack ClientConnAck
+			if err := DecodeControl(msg, &ack); err != nil {
+				slog.Warn("bad clientConnAck", "err", err)
+				continue
+			}
+			c.dialMu.Lock()
+			ch, ok := c.dialAcks[ack.ConnID]
+			delete(c.dialAcks, ack.ConnID)
+			c.dialMu.Unlock()
+			if ok {
+				ch <- ack
 			}
 		case MsgPong:
 			// StartKeepAlive 的应答,当前不统计 RTT
@@ -315,6 +349,71 @@ func (c *CtrlClient) closeConn(connID uint32, notify bool) {
 	}
 }
 
+// dialConn 查询节点串联连接
+func (c *CtrlClient) dialConn(connID uint32) *StreamConn {
+	c.dialMu.Lock()
+	defer c.dialMu.Unlock()
+	return c.dialConns[connID]
+}
+
+// removeDialConn 移除节点串联连接
+func (c *CtrlClient) removeDialConn(connID uint32) {
+	c.dialMu.Lock()
+	delete(c.dialConns, connID)
+	c.dialMu.Unlock()
+}
+
+// DialIntranet 节点串联:请求服务端在已注册流上建立一条到内网目标的连接,
+// 返回的连接即"穿过隧道的内网连接"(半关闭语义经隧道传播)。
+// connID 使用高位命名空间,与服务端分配的连接 ID 天然隔离。
+func (c *CtrlClient) DialIntranet(ctx context.Context, clientProxyName, streamId string) (net.Conn, error) {
+	if _, ok := c.pairs[clientProxyName+"\x00"+streamId]; !ok {
+		return nil, fmt.Errorf("star: stream %s/%s not registered by this client", clientProxyName, streamId)
+	}
+
+	c.dialMu.Lock()
+	if c.dialSeq >= 0x7fffffff {
+		c.dialMu.Unlock()
+		return nil, fmt.Errorf("star: dial conn id exhausted")
+	}
+	c.dialSeq++
+	connID := uint32(0x80000000) | c.dialSeq
+	sc := newStreamConn(c.sess, connID)
+	c.dialConns[connID] = sc
+	ackCh := make(chan ClientConnAck, 1)
+	c.dialAcks[connID] = ackCh
+	c.dialMu.Unlock()
+
+	cleanup := func() {
+		c.dialMu.Lock()
+		delete(c.dialConns, connID)
+		delete(c.dialAcks, connID)
+		c.dialMu.Unlock()
+	}
+
+	err := c.sess.SendControl(MsgClientConnReq, ClientConnReq{
+		ConnID: connID, ClientProxyName: clientProxyName, StreamId: streamId,
+	})
+	if err != nil {
+		cleanup()
+		return nil, fmt.Errorf("star: send clientConnReq: %w", err)
+	}
+
+	ctx2, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	select {
+	case ack := <-ackCh:
+		if ack.OK {
+			return sc, nil
+		}
+		cleanup()
+		return nil, fmt.Errorf("star: dial intranet %s/%s rejected: %s", clientProxyName, streamId, ack.Message)
+	case <-ctx2.Done():
+		cleanup()
+		return nil, fmt.Errorf("star: dial intranet %s/%s: %w", clientProxyName, streamId, ctx2.Err())
+	}
+}
+
 func (c *CtrlClient) closeAllConns() {
 	c.mu.Lock()
 	conns := c.conns
@@ -323,6 +422,14 @@ func (c *CtrlClient) closeAllConns() {
 
 	for _, conn := range conns {
 		conn.Close()
+	}
+
+	c.dialMu.Lock()
+	dials := c.dialConns
+	c.dialConns = make(map[uint32]*StreamConn)
+	c.dialMu.Unlock()
+	for _, sc := range dials {
+		sc.markClosed(io.EOF)
 	}
 }
 
