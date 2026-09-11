@@ -167,3 +167,30 @@ case star.MsgRegisterStream:
 - TLS：隧道加密，监听器 transport 层替换，协议本身不变
 - 流量控制：按 streamID 的窗口/背压（`MsgStreamClose` 负载可扩展原因码）
 - 服务端主动下发配置（对应配置文件中"后期单独开启一个流,进行控制和下发配置信息"的注释）
+
+## 节点串联:客户端主动拨号(R7)
+
+节点 A 的流量需经节点 B 落地时,A 作为客户端接入 B 的 star 入口并注册流,
+之后 A 可在自己的会话上**主动请求建立连接**:
+
+| 值 | 名称 | 方向 | 负载 |
+|-----|------|------|------|
+| 0x30 | clientConnReq | 客户端 → 服务端 | JSON `ClientConnReq` |
+| 0x31 | clientConnAck | 服务端 → 客户端 | JSON `ClientConnAck` |
+
+```go
+type ClientConnReq struct {
+    ConnID          uint32 `json:"connId"`          // 客户端分配,高位命名空间(0x80000000 起)
+    ClientProxyName string `json:"clientProxyName"` // 必须属于本凭据身份
+    StreamId        string `json:"streamId"`        // 必须已由本客户端注册
+}
+type ClientConnAck struct {
+    ConnID  uint32 `json:"connId"`
+    OK      bool   `json:"ok"`
+    Message string `json:"message,omitempty"`
+}
+```
+
+- 应答 OK 后,该 ConnID 上的 data/streamClose 帧与既有连接同语义双向流动;
+- 服务端按 clientProxy 配置的 addr 拨内网目标并与隧道流桥接(Bridge,半关闭传播);
+- connID 命名空间隔离:客户端高位(0x80000000+)、服务端低位递增,互不冲突。
