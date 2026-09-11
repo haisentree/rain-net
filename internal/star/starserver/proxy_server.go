@@ -1,6 +1,7 @@
 package starserver
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/haisentree/rain-net/internal/handler/star"
+	"github.com/haisentree/rain-net/internal/transport"
 	"github.com/haisentree/rain-net/pluginer"
 	"github.com/haisentree/rain-net/protocol/codec"
 	"github.com/haisentree/rain-net/protocol/star"
@@ -90,11 +92,19 @@ func (s *ProxyServer) pickEntry() *starhandler.StreamEntry {
 	return nil
 }
 
+// Listen 经传输注册表构建(tcp/tls/ws/h2/quic 皆可)——传输转换矩阵的入站半边
 func (s *ProxyServer) Listen() (net.Listener, error) {
-	if s.Net != "tcp" {
-		return nil, nil
+	if s.Net == "udp" {
+		return nil, nil // 数据面 v1 只做流式传输
 	}
-	return listenTCP(s.Addr, s.settings)
+	tr, err := transport.Build(s.Net, transport.Options{
+		CertFile: s.settings.CertFile,
+		KeyFile:  s.settings.KeyFile,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return tr.Listen(context.Background(), s.Addr)
 }
 
 func (s *ProxyServer) ListenPacket() (net.PacketConn, error) {
