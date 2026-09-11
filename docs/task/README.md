@@ -18,8 +18,8 @@
 | R0 | [R0-e2e-safety-net.md](R0-e2e-safety-net.md) | 迁移 e2e 到 test/e2e,建立重构安全网 | — | **done**(2026-09-11) |
 | R1 | [R1-core-abstraction.md](R1-core-abstraction.md) | pkg/rainnet + Transport 抽象 + 一致性套件(=M1) | R0 | **done**(2026-09-11) |
 | R2 | [R2-router-bridge.md](R2-router-bridge.md) | Router 迁移 + Bridge 半关闭契约 + 基础装饰器 | R1 | **done**(2026-09-11) |
-| R3 | [R3-star-split.md](R3-star-split.md) | star 拆解 + 新配置 schema + admin 聚合 + 协议半关帧 | R2 | **in-progress**(切片1-3 + 4a-4d 已合入;仅剩 4e:admin 聚合 + proxy 收口 + dialer/star) |
-| R4 | [R4-ws-transport.md](R4-ws-transport.md) | websocket transport(=M2) | R1 | pending |
+| R3 | [R3-star-split.md](R3-star-split.md) | star 拆解 + 新配置 schema + admin 聚合 + 协议半关帧 | R2 | **done**(2026-09-11,dialer/star 推迟至 R7) |
+| R4 | [R4-ws-transport.md](R4-ws-transport.md) | websocket transport(=M2) | R1 | **done**(2026-09-11) |
 | R5 | [R5-h2-transport.md](R5-h2-transport.md) | http2 h2c transport(=M3) | R1 | pending |
 | R6 | [R6-quic-transport.md](R6-quic-transport.md) | QUIC transport(=M4) | R1 | pending |
 | R7 | [R7-bridge-conversion.md](R7-bridge-conversion.md) | 传输转换矩阵全量 + 嗅探 ingress(=M5) | R2,R4–R6 | pending |
