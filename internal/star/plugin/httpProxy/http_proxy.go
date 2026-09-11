@@ -118,9 +118,5 @@ func handleCONNECT(w star.ResponseWriter, req *http.Request) error {
 	case <-errChan:
 		// 其中一个方向结束，关闭连接
 		return errors.New("errChan")
-		// 	case <-ctx.Done():
-		// // 上下文取消，停止复制
 	}
-
-	return nil
 }
