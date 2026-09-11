@@ -1,6 +1,6 @@
 # R8:产品化收尾(= roadmap M6)
 
-- 状态:pending
+- 状态:in-progress(流控 ✅ + ConfigStore/Makefile ✅ 已合入;剩热更新/DNS 迁移/可观测,2026-09-11)
 - 依赖:R3、R7
 - 关联:`docs/design.md` §七(控制面)、§九.3(取消链);`docs/research/nps.md` §2.4(功能清单);roadmap M6
 
@@ -10,9 +10,9 @@
 
 ## 交付物(可拆分独立推进)
 
-1. **star 按流流控/背压**(此后 star 封盘):参照 yamux 窗口实现,补 conformance 慢流场景;star 协议文档同步;
+1. **star 按流流控/背压** ✅(2026-09-11):Window 原语 + MsgWindowUpdate 双向流控;客户端每连接写泵消除跨流头阻塞;e2e TestFlowControlNoHOL(慢流占满窗口、快流不受影响);proxy 下行排空竞态修复(静默窗口)。**star 协议自此封盘**(协议文档帧表待同步 0x22);
 2. **配置热更新**:实例替换式重载(Caddy 路线),依赖 §九.3 取消链排空旧连接;admin API 触发;
-3. **ConfigStore**:`fileStore`(默认)/ `etcdStore`;watch 同步到多节点的 handler `Apply`;凭据/路由/DNS zones 持久化策略文档化;
+3. **ConfigStore** ✅(2026-09-11,部分):internal/configstore 接口 + FileStore(原子写/轮询 watch/键逃逸防护)+ 测试;EtcdStore 待配置中心落地(接口已预留);
 4. **DNS 迁移**:`internal/handler/dns` + dns ingress(udp/tcp transport);缓存命中不进 Bridge;线路匹配(地理/运营商);`/api/dns/*/zones` 外置管理;上游 dialer 化 → DoT/DoH = tls/http transport 出口;
 5. **可观测性**:metrics(错误三分类、每 transport 连接数/流量)、日志贯穿 ConnID、admin 大盘补充;
 6. **分发**:单二进制构建(linux/amd64/arm64 + darwin + windows)、最小 systemd 单元、文档站骨架。
