@@ -276,13 +276,22 @@ func (s *CtrlProxyServer) handleConn(conn net.Conn) {
 				slog.Debug("data for unknown conn", "conn", msg.StreamID)
 			}
 		case star.MsgStreamClose:
-			// 先按连接处理(客户端侧后端关闭,半关闭语义排空在途数据);
-			// 不是连接则视为注销服务流
-			if s.hub.ClientClosed(msg.StreamID) {
-				slog.Debug("conn closed by client", "conn", msg.StreamID)
-			} else {
+			// 半关(FlagHalfClose)= 客户端内网侧写完,下行排空后对外部半关闭;
+			// 全关(历史语义)= 整条连接终止。先按连接处理,不是连接则视为注销服务流
+			if !msg.IsHalfClose() {
+				if s.hub.HasConn(msg.StreamID) {
+					s.hub.CloseConn(msg.StreamID, false)
+					slog.Debug("conn fully closed by client", "conn", msg.StreamID)
+					continue
+				}
 				s.hub.Streams.Remove(msg.StreamID)
 				slog.Debug("stream closed", "stream", msg.StreamID)
+				continue
+			}
+			if s.hub.ClientClosed(msg.StreamID) {
+				slog.Debug("conn half-closed by client", "conn", msg.StreamID)
+			} else {
+				slog.Debug("half close for unknown conn", "conn", msg.StreamID)
 			}
 		default:
 			slog.Debug("unexpected message", "type", msg.TypeName())

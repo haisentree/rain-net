@@ -2,11 +2,15 @@ package star
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/haisentree/rain-net/pkg/rainnet"
 )
 
 // uplinkChunk 客户端上行(内网服务 -> ctrl 通道)的读取块大小
@@ -25,9 +29,9 @@ type CtrlClient struct {
 	sess *Session
 
 	mu        sync.RWMutex
-	streams   map[string]uint32   // 配置里的字符串 streamId -> 服务端分配的数字流ID
-	streamIDs map[uint32]string   // 数字流ID -> 字符串 streamId
-	conns     map[uint32]net.Conn // 连接ID -> 内网服务连接
+	streams   map[string]uint32       // 配置里的字符串 streamId -> 服务端分配的数字流ID
+	streamIDs map[uint32]string       // 数字流ID -> 字符串 streamId
+	conns     map[uint32]rainnet.Conn // 连接ID -> 内网服务连接(半关闭语义经 Conn 传播)
 
 	// LocalDialer 服务端请求建立连接时,按 streamId 拨号内网服务
 	LocalDialer func(streamId string) (net.Conn, error)
@@ -72,7 +76,7 @@ func DialCtrlTLS(network, addr string, req HandshakeReq, streams []RegisterStrea
 		sess:      NewSession(conn),
 		streams:   make(map[string]uint32, len(streams)),
 		streamIDs: make(map[uint32]string, len(streams)),
-		conns:     make(map[uint32]net.Conn),
+		conns:     make(map[uint32]rainnet.Conn),
 		closed:    make(chan struct{}),
 	}
 
@@ -174,8 +178,13 @@ func (c *CtrlClient) Run() error {
 		case MsgData:
 			c.writeConn(msg.StreamID, msg.Payload)
 		case MsgStreamClose:
-			// 服务端侧先关闭,notify=false 避免再回发关流帧
-			c.closeConn(msg.StreamID, false)
+			// 半关 = 服务端不再上行,内网连接写侧关闭(排空语义由对端负责),
+			// 连接保留,上行泵继续;全关 = 整条终止。notify=false 避免回发关流帧
+			if msg.IsHalfClose() {
+				c.halfCloseConn(msg.StreamID)
+			} else {
+				c.closeConn(msg.StreamID, false)
+			}
 		case MsgPing:
 			// 服务端探测保活,原样回 pong
 			if err := c.sess.Send(&Message{Type: MsgPong, StreamID: msg.StreamID, Payload: msg.Payload}); err != nil {
@@ -231,15 +240,18 @@ func (c *CtrlClient) handleConnOpen(msg *Message) {
 		return
 	}
 
+	rc := rainnet.Wrap(conn, rainnet.Meta{})
 	c.mu.Lock()
-	c.conns[req.ConnID] = conn
+	c.conns[req.ConnID] = rc
 	c.mu.Unlock()
 
-	go c.pumpUplink(req.ConnID, conn)
+	go c.pumpUplink(req.ConnID, rc)
 }
 
-// pumpUplink 内网服务 -> ctrl 通道方向:读到多少发多少,连接结束通知服务端
-func (c *CtrlClient) pumpUplink(connID uint32, conn net.Conn) {
+// pumpUplink 内网服务 -> ctrl 通道方向:读到多少发多少。
+// 读到 EOF(内网侧写完)发半关帧,连接保留——内网仍可继续收上行数据;
+// 其他错误整条关闭并通知服务端。
+func (c *CtrlClient) pumpUplink(connID uint32, conn rainnet.Conn) {
 	buf := make([]byte, uplinkChunk)
 	for {
 		n, err := conn.Read(buf)
@@ -249,10 +261,28 @@ func (c *CtrlClient) pumpUplink(connID uint32, conn net.Conn) {
 			}
 		}
 		if err != nil {
-			break
+			if errors.Is(err, io.EOF) {
+				_ = c.sess.Send(HalfClose(connID))
+			} else {
+				c.closeConn(connID, true)
+			}
+			return
 		}
 	}
+	// conn 已被本地 Close:通知服务端整条终止
 	c.closeConn(connID, true)
+}
+
+// halfCloseConn 服务端半关闭:内网连接写侧关闭,连接保留
+func (c *CtrlClient) halfCloseConn(connID uint32) {
+	c.mu.RLock()
+	conn := c.conns[connID]
+	c.mu.RUnlock()
+	if conn == nil {
+		return
+	}
+	// 本地连接不支持半关闭时无法通知内网,保持现状(降级)
+	_ = conn.CloseWrite()
 }
 
 // writeConn 服务端下行数据写入内网连接
@@ -288,7 +318,7 @@ func (c *CtrlClient) closeConn(connID uint32, notify bool) {
 func (c *CtrlClient) closeAllConns() {
 	c.mu.Lock()
 	conns := c.conns
-	c.conns = make(map[uint32]net.Conn)
+	c.conns = make(map[uint32]rainnet.Conn)
 	c.mu.Unlock()
 
 	for _, conn := range conns {

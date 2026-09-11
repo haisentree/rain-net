@@ -429,3 +429,110 @@ func TestReverseProxyEndToEnd(t *testing.T) {
 		t.Fatal("expected conn close when no stream available")
 	}
 }
+
+// startEOFReactiveServer 模拟"必须读到 EOF 才应答"的内网服务(如按连接分帧的上传处理):
+// ReadAll 等对端半关闭,然后应答并关闭。旧实现下该服务永远等不到 EOF。
+func startEOFReactiveServer(t *testing.T, reply string) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { ln.Close() })
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				if _, err := io.ReadAll(c); err != nil {
+					return
+				}
+				_, _ = c.Write([]byte(reply))
+			}(conn)
+		}
+	}()
+	return ln.Addr().String()
+}
+
+// TestProxyHalfCloseEndToEnd 半关闭穿透隧道(端到端契约,docs/design.md 半关闭矩阵):
+// 外部用户写完即关写 → 代理上行 EOF 发半关帧 → 客户端内网连接关写 →
+// EOF 反应式后端应答 → 客户端发半关帧 → 代理排空后对外部半关闭 →
+// 外部用户收到完整应答 + EOF。修复前:上行 EOF 直接整条拆除,应答被丢弃。
+func TestProxyHalfCloseEndToEnd(t *testing.T) {
+	backend := startEOFReactiveServer(t, "eof-reactive-ok")
+
+	hub := starserver.NewCtrlHub()
+	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
+		Type:      "ctrlproxy",
+		Transport: "tcp",
+		Settings: starserver.Settings{
+			ClientProxy: []starserver.ClientProxy{{ClientProxyName: "clientProxy-0", KeyPassword: "pwd"}},
+		},
+	}, hub)
+	ctrlLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ctrlLn.Close()
+	go func() { _ = ctrl.Serve(ctrlLn) }()
+
+	connectTable := starserver.NewConnectTable()
+	connectTable.Seed([]starserver.ConnectItem{{ProxyName: "p0", ClientProxyName: "clientProxy-0", StreamId: "stream-0"}})
+	proxy, perr := starserver.NewProxyServer("svc", &starserver.ListenerList{
+		Type:      "proxy",
+		Transport: "tcp",
+		Settings:  starserver.Settings{ProxyName: "p0"},
+	}, connectTable, hub)
+	if perr != nil {
+		t.Fatal(perr)
+	}
+	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer proxyLn.Close()
+	go func() { _ = proxy.Serve(proxyLn) }()
+
+	client, err := star.DialCtrl("tcp", ctrlLn.Addr().String(),
+		star.HandshakeReq{ClientName: "dailer-0", KeyPassword: "pwd"},
+		[]star.RegisterStreamReq{{ClientProxyName: "clientProxy-0", StreamId: "stream-0"}},
+		3*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	client.LocalDialer = func(streamId string) (net.Conn, error) {
+		return net.Dial("tcp", backend)
+	}
+	go func() { _ = client.Run() }()
+
+	waitFor(t, 3*time.Second, "stream registered", func() bool {
+		return hub.Streams.Len() == 1
+	})
+
+	ext, err := net.Dial("tcp", proxyLn.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ext.Close()
+	if err := ext.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ext.Write([]byte("upload-payload")); err != nil {
+		t.Fatal(err)
+	}
+	if err := ext.(*net.TCPConn).CloseWrite(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(ext)
+	if err != nil {
+		t.Fatalf("read reply: %v", err)
+	}
+	if string(got) != "eof-reactive-ok" {
+		t.Fatalf("reply = %q, want %q", got, "eof-reactive-ok")
+	}
+}

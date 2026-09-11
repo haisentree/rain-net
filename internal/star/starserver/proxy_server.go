@@ -1,6 +1,8 @@
 package starserver
 
 import (
+	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"sync"
@@ -139,39 +141,64 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 	slog.Info("proxy conn via stream", "conn", e.ConnID, "stream", e.StreamId,
 		"codec", s.inCodec.Name(), "remote", conn.RemoteAddr())
 
-	// 双向任一方向结束都收尾:停泵 -> 通知客户端关连接
+	// 生命周期与 R2 Bridge 状态机同构:两个方向独立收尾,
+	// 双方向都结束(或任一方向出错)才整条拆除。
+	// 上行 EOF → 半关帧通知客户端;下行半关帧 → 排空后对外部 CloseWrite(支持则)。
 	done := make(chan struct{})
 	var once sync.Once
 	stop := func() { once.Do(func() { close(done) }) }
-	defer func() {
-		stop()
-		s.hub.CloseConn(e.ConnID, true)
-		mc.Close()
-	}()
+
+	var (
+		teardownOnce sync.Once
+		upDone       atomic.Bool
+		downDone     atomic.Bool
+	)
+	teardown := func() {
+		teardownOnce.Do(func() {
+			stop()
+			s.hub.CloseConn(e.ConnID, true)
+			mc.Close()
+		})
+	}
+	defer teardown()
+	bothFinished := func() {
+		if upDone.Load() && downDone.Load() {
+			teardown()
+		}
+	}
 
 	// 下行泵:ctrl 通道 -> 外部连接(按入站协议编码)
 	go func() {
-		defer stop()
+		defer func() { stop() }()
 		for {
 			select {
 			case payload := <-e.sink:
 				if err := mc.WriteMessage(payload); err != nil {
+					teardown()
 					return
 				}
 			case <-e.remoteClosed:
-				// 客户端侧后端已关闭:按序排空在途数据后收尾
+				// 客户端内网侧写完:按序排空在途数据
 				for {
 					select {
 					case payload := <-e.sink:
 						if err := mc.WriteMessage(payload); err != nil {
+							teardown()
 							return
 						}
 					default:
-						mc.Close()
+						downDone.Store(true)
+						// 支持半关闭则只关外部写侧,外部仍可继续上行;否则降级整条关闭
+						if cw, ok := mc.(interface{ CloseWrite() error }); ok && cw.CloseWrite() == nil {
+							bothFinished()
+							return
+						}
+						teardown()
 						return
 					}
 				}
 			case <-e.done:
+				teardown()
 				return
 			case <-done:
 				return
@@ -183,7 +210,16 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 	for {
 		payload, err := mc.ReadMessage()
 		if err != nil {
-			return
+			if errors.Is(err, io.EOF) {
+				// 外部用户不再上行:半关帧通知客户端(内网连接关写),
+				// 本方向结束,等下行泵收尾
+				upDone.Store(true)
+				_ = e.Client.Send(star.HalfClose(e.ConnID))
+				bothFinished()
+				<-done
+				return
+			}
+			return // defer teardown 整条拆除
 		}
 		if err := e.Client.Send(&star.Message{
 			Type:     star.MsgData,
