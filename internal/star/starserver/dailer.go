@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // 重连退避参数:首次 1 秒,每次翻倍,封顶 30 秒;连接成功后复位

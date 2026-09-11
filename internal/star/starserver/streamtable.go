@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // StreamEntry 一条已注册的流:客户端把内网服务注册到服务端后的记录
@@ -29,9 +29,9 @@ type StreamEntry struct {
 
 // StreamStat 流的只读快照,用于 API 查询
 type StreamStat struct {
-	AssignID        uint32 `json:"assignId"`
-	ClientProxyName string `json:"clientProxyName"`
-	StreamId        string `json:"streamId"`
+	AssignID        uint32    `json:"assignId"`
+	ClientProxyName string    `json:"clientProxyName"`
+	StreamId        string    `json:"streamId"`
 	Since           time.Time `json:"since"`
 	InBytes         uint64    `json:"inBytes"`
 	OutBytes        uint64    `json:"outBytes"`

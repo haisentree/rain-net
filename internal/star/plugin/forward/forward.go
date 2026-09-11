@@ -8,8 +8,8 @@ import (
 	"net"
 	"time"
 
-	"rain-net/internal/star/plugin"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/internal/star/plugin"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // Forward TCP 端口转发插件:把监听器收到的连接原样转发到 settings.target

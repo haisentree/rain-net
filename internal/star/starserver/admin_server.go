@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"rain-net/pluginer"
+	"github.com/haisentree/rain-net/pluginer"
 )
 
 // AdminServer 管理 API 监听器(type: admin)

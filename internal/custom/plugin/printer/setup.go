@@ -1,9 +1,9 @@
 package printer
 
 import (
-	"rain-net/internal/custom/customserver"
-	"rain-net/internal/custom/plugin"
-	"rain-net/pluginer"
+	"github.com/haisentree/rain-net/internal/custom/customserver"
+	"github.com/haisentree/rain-net/internal/custom/plugin"
+	"github.com/haisentree/rain-net/pluginer"
 )
 
 func init() {

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"rain-net/pluginer"
+
+	"github.com/haisentree/rain-net/internal/transport"
+	"github.com/haisentree/rain-net/pluginer"
 
 	"gopkg.in/yaml.v3"
 )
@@ -181,24 +183,23 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 				continue
 			}
 
-			switch listener.Transport {
-			case "tcp":
-				s, err := NewServer(srv.Name, listener.Transport, listener.Addr, h.ZoneToConfigs[key])
-				if err != nil {
-					slog.Warn("tcp NewServer", "err", err)
-					continue
-				}
-				servers = append(servers, s)
-			case "udp":
-				s, err := NewServer(srv.Name, listener.Transport, listener.Addr, h.ZoneToConfigs[key])
-				if err != nil {
-					slog.Warn("udp NewServer", "err", err)
-					continue
-				}
-				servers = append(servers, s)
-			default:
-				panic(fmt.Sprintf("unsupported transport: %s", listener.Transport))
+			// udp 走 PacketConn 特例(ListenPacket),transport 层 v1 不建模 UDP 数据报;
+			// 其余传输必须已在 transport 注册表注册(tcp/tls/…),装配层不硬编码
+			tOpts := transport.Options{
+				CertFile: listener.Settings.CertFile,
+				KeyFile:  listener.Settings.KeyFile,
 			}
+			if listener.Transport != "udp" {
+				if _, err := transport.Build(listener.Transport, tOpts); err != nil {
+					return nil, err
+				}
+			}
+			s, err := NewServer(srv.Name, listener.Transport, listener.Addr, h.ZoneToConfigs[key], tOpts)
+			if err != nil {
+				slog.Warn("NewServer", "transport", listener.Transport, "err", err)
+				continue
+			}
+			servers = append(servers, s)
 		}
 	}
 

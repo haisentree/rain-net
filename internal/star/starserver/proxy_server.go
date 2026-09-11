@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"rain-net/protocol/codec"
-	"rain-net/pluginer"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/pluginer"
+	"github.com/haisentree/rain-net/protocol/codec"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // ProxyServer 数据面代理监听器(type: proxy)

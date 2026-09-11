@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"rain-net/internal/star/starserver"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/internal/star/starserver"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // startEchoServer 起一个本地 echo 服务,模拟内网中的服务

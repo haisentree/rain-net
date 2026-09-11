@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // waitFor 轮询等待条件成立,超时则失败

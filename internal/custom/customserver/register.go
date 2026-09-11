@@ -3,8 +3,8 @@ package customserver
 import (
 	"errors"
 	"fmt"
+	"github.com/haisentree/rain-net/pluginer"
 	"os"
-	"rain-net/pluginer"
 
 	"gopkg.in/yaml.v3"
 )

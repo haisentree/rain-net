@@ -1,4 +1,4 @@
-module rain-net
+module github.com/haisentree/rain-net
 
 go 1.26
 

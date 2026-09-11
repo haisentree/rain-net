@@ -1,6 +1,6 @@
 # R1:核心抽象定型(= roadmap M1)
 
-- 状态:pending
+- 状态:done(2026-09-11)
 - 依赖:R0
 - 关联:`docs/design.md` §二(模型)、§三(命名)、§四(目录)、§九.1(conformance)、§九.4(Meta.ID)
 
@@ -26,13 +26,13 @@
 4. 写 `test/conformance`,先对 tcp/tls 跑通;
 5. 更新 design.md 若接口签名有微调。(原"修两个编译错误"已由 R0 完成)
 
-## 验收标准
+## 验收结果
 
-- [ ] `go test ./...` 全绿(e2e 基线不回退);
-- [ ] 新增一种 transport 只需"一个目录 + init 注册",register.go 无需改动;
-- [ ] conformance 套件对 tcp/tls 全过;
-- [ ] 接口总数 ≤ 6(design.md §二 表内角色),无新发明接口。
+- [x] `go test ./...` 全绿(e2e 基线 30 用例不回退,conformance 新增 12 个子场景);
+- [x] 新增一种 transport 只需"一个目录 + init 注册",zplugin 加一行空白导入,register.go/装配层零改动;
+- [x] conformance 套件对 tcp/tls 全过(并在首次运行就逮住 Listen ctx 契约缺口,催生 transport.WatchClose);
+- [x] 接口总数 ≤ 6(rainnet.Conn、transport.Transport,pluginer Handler 沿用),无新发明接口。
 
 ## 进度日志
 
-- (无)
+- 2026-09-11:完成。module 路径全局替换 → github.com/haisentree/rain-net;pkg/rainnet(Conn/Meta/Wrap/适配器);internal/transport(接口+Registry+BuildFunc+WatchClose)+ tcp/tls 实现;register.go 查表化(udp 保留 PacketConn 特例;未知传输由 panic 改为启动报错,行为微调已记录);test/conformance 六场景套件;GitHub Actions CI(vet+test+gofmt)。接口微调已回写 design.md §二。分支 r1-core。
