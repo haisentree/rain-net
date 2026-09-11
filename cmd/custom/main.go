@@ -1,8 +1,8 @@
 package main
 
 import (
-	"rain-net/internal/custom/customserver"
-	_ "rain-net/internal/custom/zplugin"
+	"github.com/haisentree/rain-net/internal/custom/customserver"
+	_ "github.com/haisentree/rain-net/internal/custom/zplugin"
 )
 
 func main() {

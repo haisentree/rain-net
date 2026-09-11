@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"net"
-	"rain-net/internal/star/plugin"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/internal/star/plugin"
+	"github.com/haisentree/rain-net/protocol/star"
 	"sync"
 	"time"
 )

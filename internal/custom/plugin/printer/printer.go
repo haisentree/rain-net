@@ -3,8 +3,8 @@ package printer
 import (
 	"context"
 	"fmt"
-	"rain-net/internal/custom/plugin"
-	"rain-net/protocol/custom"
+	"github.com/haisentree/rain-net/internal/custom/plugin"
+	"github.com/haisentree/rain-net/protocol/custom"
 )
 
 type Printer struct {

@@ -1,6 +1,6 @@
 package plugin
 
-import "rain-net/pluginer"
+import "github.com/haisentree/rain-net/pluginer"
 
 // Register registers your plugin with CoreDNS and allows it to be called when the server is running.
 func Register(name string, action pluginer.SetupFunc) {

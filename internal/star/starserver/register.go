@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"rain-net/pluginer"
+	"github.com/haisentree/rain-net/pluginer"
 
 	"gopkg.in/yaml.v3"
 )

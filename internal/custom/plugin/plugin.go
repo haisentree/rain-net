@@ -2,7 +2,7 @@ package plugin
 
 import (
 	"context"
-	"rain-net/protocol/custom"
+	"github.com/haisentree/rain-net/protocol/custom"
 
 	"github.com/miekg/dns"
 )

@@ -1,6 +1,6 @@
 package dnsserver
 
-import "rain-net/pluginer"
+import "github.com/haisentree/rain-net/pluginer"
 
 const serverType = "dns"
 

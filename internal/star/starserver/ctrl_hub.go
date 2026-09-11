@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // openConnTimeout 建立连接请求的应答等待超时

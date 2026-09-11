@@ -2,8 +2,8 @@ package starserver
 
 import (
 	"fmt"
-	"rain-net/internal/star/plugin"
-	"rain-net/pluginer"
+	"github.com/haisentree/rain-net/internal/star/plugin"
+	"github.com/haisentree/rain-net/pluginer"
 )
 
 type Config struct {

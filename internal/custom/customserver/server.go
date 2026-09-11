@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"rain-net/internal/custom/plugin"
-	custom "rain-net/protocol/custom"
+	"github.com/haisentree/rain-net/internal/custom/plugin"
+	custom "github.com/haisentree/rain-net/protocol/custom"
 )
 
 // custom启动指定端口的

@@ -1,6 +1,6 @@
 package customserver
 
-import "rain-net/pluginer"
+import "github.com/haisentree/rain-net/pluginer"
 
 func Run() {
 	// pluginer.TrapSignalsCrossPlatform()

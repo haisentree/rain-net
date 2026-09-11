@@ -3,8 +3,8 @@ package printer
 import (
 	"context"
 	"fmt"
-	"rain-net/internal/star/plugin"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/internal/star/plugin"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 type Printer struct {

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"rain-net/pluginer"
+	"github.com/haisentree/rain-net/pluginer"
 
 	"gopkg.in/yaml.v3"
 )

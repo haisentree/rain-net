@@ -2,10 +2,10 @@ package customserver
 
 import (
 	"fmt"
-	"rain-net/internal/custom/plugin"
+	"github.com/haisentree/rain-net/internal/custom/plugin"
 
-	// "rain-net/internal/custom/zplugin"
-	"rain-net/pluginer"
+	// "github.com/haisentree/rain-net/internal/custom/zplugin"
+	"github.com/haisentree/rain-net/pluginer"
 )
 
 // 协议特有的配置

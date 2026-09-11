@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"rain-net/pluginer"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/pluginer"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // clientInfo 在线客户端的运行时信息

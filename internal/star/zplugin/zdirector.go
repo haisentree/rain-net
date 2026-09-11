@@ -1,8 +1,8 @@
 package zplugin
 
 import (
-	_ "rain-net/internal/star/plugin/forward"
-	_ "rain-net/internal/star/plugin/httpProxy"
-	_ "rain-net/internal/star/plugin/printer"
-	_ "rain-net/internal/star/plugin/socks5"
+	_ "github.com/haisentree/rain-net/internal/star/plugin/forward"
+	_ "github.com/haisentree/rain-net/internal/star/plugin/httpProxy"
+	_ "github.com/haisentree/rain-net/internal/star/plugin/printer"
+	_ "github.com/haisentree/rain-net/internal/star/plugin/socks5"
 )

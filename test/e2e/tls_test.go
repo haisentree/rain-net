@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"rain-net/internal/star/starserver"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/internal/star/starserver"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // genSelfSignedCert 生成测试用自签名证书(SAN: localhost/127.0.0.1)

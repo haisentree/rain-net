@@ -4,7 +4,7 @@ import (
 	"net"
 	"time"
 
-	"rain-net/protocol/ws"
+	"github.com/haisentree/rain-net/protocol/ws"
 )
 
 // wsCodec WebSocket 适配器:入站做服务端升级,出站做客户端握手

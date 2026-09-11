@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"rain-net/internal/star/starserver"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/internal/star/starserver"
+	"github.com/haisentree/rain-net/protocol/star"
 
 	"gopkg.in/yaml.v3"
 )

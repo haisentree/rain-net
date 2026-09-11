@@ -2,7 +2,7 @@ package plugin
 
 import (
 	"context"
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 type (

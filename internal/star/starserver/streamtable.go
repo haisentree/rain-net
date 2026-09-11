@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"rain-net/protocol/star"
+	"github.com/haisentree/rain-net/protocol/star"
 )
 
 // StreamEntry 一条已注册的流:客户端把内网服务注册到服务端后的记录
