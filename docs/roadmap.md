@@ -74,6 +74,8 @@ h2、quic、kcp(以及自研 star)一条物理连接承载多条流。Transport 
 6. **M6 产品化收尾**:star 协议按流流控/背压、配置热更新、可观测性、单二进制分发、文档站。
 7. 加餐(可选):kcp transport(ARQ 与拥塞控制,独立知识块)。
 
+> 以上里程碑已展开为可跨会话领取的长任务队列(R0–R9),见 `docs/task/README.md`。
+
 ## 五、现状盘点(2026-09-10)
 
 - 核心测试全绿:`protocol/star`、`internal/star/starserver`(含 e2e);
