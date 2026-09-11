@@ -1,4 +1,4 @@
-package starserver
+package e2e
 
 import (
 	"io"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"rain-net/internal/star/starserver"
 	"rain-net/protocol/star"
 )
 
@@ -94,12 +95,12 @@ func TestProxyFailoverAcrossClients(t *testing.T) {
 	backend0 := startFixedServer(t, "from-0")
 	backend1 := startFixedServer(t, "from-1")
 
-	hub := NewCtrlHub()
-	ctrl := NewCtrlProxyServer("svc", &ListenerList{
+	hub := starserver.NewCtrlHub()
+	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
-		Settings: Settings{
-			ClientProxy: []ClientProxy{
+		Settings: starserver.Settings{
+			ClientProxy: []starserver.ClientProxy{
 				{ClientProxyName: "clientProxy-0", KeyPassword: "pwd-0"},
 				{ClientProxyName: "clientProxy-1", KeyPassword: "pwd-1"},
 			},
@@ -112,18 +113,18 @@ func TestProxyFailoverAcrossClients(t *testing.T) {
 	defer ctrlLn.Close()
 	go func() { _ = ctrl.Serve(ctrlLn) }()
 
-	connectTable := NewConnectTable()
-	connectTable.Seed([]ConnectItem{
+	connectTable := starserver.NewConnectTable()
+	connectTable.Seed([]starserver.ConnectItem{
 		{ProxyName: "p0", ClientProxyName: "clientProxy-0", StreamId: "stream-0"},
 		{ProxyName: "p0", ClientProxyName: "clientProxy-1", StreamId: "stream-0"},
 	})
-	proxy, perr := NewProxyServer("svc", &ListenerList{
+	proxy, perr := starserver.NewProxyServer("svc", &starserver.ListenerList{
 		Type:      "proxy",
 		Transport: "tcp",
-		Settings:  Settings{ProxyName: "p0"},
+		Settings:  starserver.Settings{ProxyName: "p0"},
 	}, connectTable, hub)
 	if perr != nil {
-		t.Fatalf("NewProxyServer: %v", perr)
+		t.Fatalf("starserver.NewProxyServer: %v", perr)
 	}
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -189,6 +190,7 @@ func TestProxyFailoverAcrossClients(t *testing.T) {
 		t.Fatalf("after recovery expected both backends, got %v", seen)
 	}
 }
+
 // startCloseAfterReplyServer 模拟 HTTP/1.0 风格的内网服务:
 // 读到请求后立即回复并关闭连接(如 python http.server)
 func startCloseAfterReplyServer(t *testing.T, reply string) string {
@@ -223,12 +225,12 @@ func startCloseAfterReplyServer(t *testing.T, reply string) string {
 func TestProxyBackendClosesAfterReply(t *testing.T) {
 	backend := startCloseAfterReplyServer(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok")
 
-	hub := NewCtrlHub()
-	ctrl := NewCtrlProxyServer("svc", &ListenerList{
+	hub := starserver.NewCtrlHub()
+	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
-		Settings: Settings{
-			ClientProxy: []ClientProxy{{ClientProxyName: "clientProxy-0", KeyPassword: "pwd"}},
+		Settings: starserver.Settings{
+			ClientProxy: []starserver.ClientProxy{{ClientProxyName: "clientProxy-0", KeyPassword: "pwd"}},
 		},
 	}, hub)
 	ctrlLn, err := net.Listen("tcp", "127.0.0.1:0")
@@ -238,15 +240,15 @@ func TestProxyBackendClosesAfterReply(t *testing.T) {
 	defer ctrlLn.Close()
 	go func() { _ = ctrl.Serve(ctrlLn) }()
 
-	connectTable := NewConnectTable()
-	connectTable.Seed([]ConnectItem{{ProxyName: "p0", ClientProxyName: "clientProxy-0", StreamId: "stream-0"}})
-	proxy, perr := NewProxyServer("svc", &ListenerList{
+	connectTable := starserver.NewConnectTable()
+	connectTable.Seed([]starserver.ConnectItem{{ProxyName: "p0", ClientProxyName: "clientProxy-0", StreamId: "stream-0"}})
+	proxy, perr := starserver.NewProxyServer("svc", &starserver.ListenerList{
 		Type:      "proxy",
 		Transport: "tcp",
-		Settings:  Settings{ProxyName: "p0"},
+		Settings:  starserver.Settings{ProxyName: "p0"},
 	}, connectTable, hub)
 	if perr != nil {
-		t.Fatalf("NewProxyServer: %v", perr)
+		t.Fatalf("starserver.NewProxyServer: %v", perr)
 	}
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -286,12 +288,12 @@ func TestProxyBackendClosesAfterReply(t *testing.T) {
 func TestReverseProxyEndToEnd(t *testing.T) {
 	echoAddr := startEchoServer(t)
 
-	hub := NewCtrlHub()
+	hub := starserver.NewCtrlHub()
 
-	ctrl := NewCtrlProxyServer("svc", &ListenerList{
+	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
-		Settings:  Settings{KeyPassword: "pwd"},
+		Settings:  starserver.Settings{KeyPassword: "pwd"},
 	}, hub)
 	ctrlLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -300,19 +302,19 @@ func TestReverseProxyEndToEnd(t *testing.T) {
 	defer ctrlLn.Close()
 	go func() { _ = ctrl.Serve(ctrlLn) }()
 
-	connectTable := NewConnectTable()
-	connectTable.Seed([]ConnectItem{{
+	connectTable := starserver.NewConnectTable()
+	connectTable.Seed([]starserver.ConnectItem{{
 		ProxyName:       "listener-proxy-0",
 		ClientProxyName: "clientProxy-0",
 		StreamId:        "stream-0",
 	}})
-	proxy, perr := NewProxyServer("svc", &ListenerList{
+	proxy, perr := starserver.NewProxyServer("svc", &starserver.ListenerList{
 		Type:      "proxy",
 		Transport: "tcp",
-		Settings:  Settings{ProxyName: "listener-proxy-0"},
+		Settings:  starserver.Settings{ProxyName: "listener-proxy-0"},
 	}, connectTable, hub)
 	if perr != nil {
-		t.Fatalf("NewProxyServer: %v", perr)
+		t.Fatalf("starserver.NewProxyServer: %v", perr)
 	}
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

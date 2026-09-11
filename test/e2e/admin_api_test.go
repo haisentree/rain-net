@@ -1,4 +1,4 @@
-package starserver
+package e2e
 
 import (
 	"bytes"
@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"rain-net/internal/star/starserver"
 	"rain-net/protocol/star"
 )
 
 func TestConnectTable(t *testing.T) {
-	ct := NewConnectTable()
+	ct := starserver.NewConnectTable()
 
-	ct.Seed([]ConnectItem{
+	ct.Seed([]starserver.ConnectItem{
 		{ProxyName: "p0", ClientProxyName: "cp-0", StreamId: "s-0"},
 		{ProxyName: "p0", ClientProxyName: "cp-1", StreamId: "s-1"},
 	})
@@ -24,10 +25,10 @@ func TestConnectTable(t *testing.T) {
 	}
 
 	// 重复添加被拒绝
-	if ct.Add(ConnectItem{ProxyName: "p0", ClientProxyName: "cp-0", StreamId: "s-0"}) {
+	if ct.Add(starserver.ConnectItem{ProxyName: "p0", ClientProxyName: "cp-0", StreamId: "s-0"}) {
 		t.Fatal("expected duplicate add to fail")
 	}
-	if !ct.Add(ConnectItem{ProxyName: "p0", ClientProxyName: "cp-2", StreamId: "s-2"}) {
+	if !ct.Add(starserver.ConnectItem{ProxyName: "p0", ClientProxyName: "cp-2", StreamId: "s-2"}) {
 		t.Fatal("expected new add to succeed")
 	}
 
@@ -43,7 +44,7 @@ func TestConnectTable(t *testing.T) {
 
 	// For 返回副本,外部修改不影响内部状态
 	rules := ct.For("p0")
-	rules[0] = ConnectItem{}
+	rules[0] = starserver.ConnectItem{}
 	if got := len(ct.For("p0")); got != 2 {
 		t.Fatalf("For(p0) len after external mutation = %d, want 2", got)
 	}
@@ -52,13 +53,13 @@ func TestConnectTable(t *testing.T) {
 func TestAdminAPI(t *testing.T) {
 	backend := startCloseAfterReplyServer(t, "HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok")
 
-	hub := NewCtrlHub()
-	connectTable := NewConnectTable()
+	hub := starserver.NewCtrlHub()
+	connectTable := starserver.NewConnectTable()
 
-	ctrl := NewCtrlProxyServer("svc", &ListenerList{
+	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
-		Settings:  Settings{}, // 初始无任何凭据,全部经 admin API 动态发放
+		Settings:  starserver.Settings{}, // 初始无任何凭据,全部经 admin API 动态发放
 	}, hub)
 	ctrlLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -67,13 +68,13 @@ func TestAdminAPI(t *testing.T) {
 	defer ctrlLn.Close()
 	go func() { _ = ctrl.Serve(ctrlLn) }()
 
-	proxy, perr := NewProxyServer("svc", &ListenerList{
+	proxy, perr := starserver.NewProxyServer("svc", &starserver.ListenerList{
 		Type:      "proxy",
 		Transport: "tcp",
-		Settings:  Settings{ProxyName: "p0"},
+		Settings:  starserver.Settings{ProxyName: "p0"},
 	}, connectTable, hub)
 	if perr != nil {
-		t.Fatalf("NewProxyServer: %v", perr)
+		t.Fatalf("starserver.NewProxyServer: %v", perr)
 	}
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -82,10 +83,10 @@ func TestAdminAPI(t *testing.T) {
 	defer proxyLn.Close()
 	go func() { _ = proxy.Serve(proxyLn) }()
 
-	admin := NewAdminServer("admin", &ListenerList{
+	admin := starserver.NewAdminServer("admin", &starserver.ListenerList{
 		Addr:     "127.0.0.1:0",
-		Settings: Settings{AdminPassword: "secret"},
-	}, hub, connectTable, []*CtrlProxyServer{ctrl})
+		Settings: starserver.Settings{AdminPassword: "secret"},
+	}, hub, connectTable, []*starserver.CtrlProxyServer{ctrl})
 	adminLn, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("admin listen: %v", err)
@@ -130,19 +131,19 @@ func TestAdminAPI(t *testing.T) {
 	}
 
 	// 2) 动态发放凭据 + 路由规则
-	if code, body = do("POST", "/api/clientProxies", ClientProxy{
+	if code, body = do("POST", "/api/clientProxies", starserver.ClientProxy{
 		ClientProxyName: "cp-dyn", StreamId: "s-dyn",
 		Addr: backend, Transport: "tcp", KeyPassword: "dyn-pwd",
 	}, "secret"); code != http.StatusOK {
 		t.Fatalf("add clientProxy = %d, body %s", code, body)
 	}
 	// 重复添加冲突
-	if code, _ = do("POST", "/api/clientProxies", ClientProxy{
+	if code, _ = do("POST", "/api/clientProxies", starserver.ClientProxy{
 		ClientProxyName: "cp-dyn", StreamId: "s-dyn", KeyPassword: "dyn-pwd",
 	}, "secret"); code != http.StatusConflict {
 		t.Fatalf("duplicate add = %d, want 409", code)
 	}
-	if code, body = do("POST", "/api/connects", ConnectItem{
+	if code, body = do("POST", "/api/connects", starserver.ConnectItem{
 		ProxyName: "p0", ClientProxyName: "cp-dyn", StreamId: "s-dyn",
 	}, "secret"); code != http.StatusOK {
 		t.Fatalf("add connect = %d, body %s", code, body)
@@ -174,7 +175,7 @@ func TestAdminAPI(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("streams = %d", code)
 	}
-	var streams []StreamStat
+	var streams []starserver.StreamStat
 	if err := json.Unmarshal([]byte(body), &streams); err != nil {
 		t.Fatalf("decode streams: %v", err)
 	}
@@ -208,7 +209,7 @@ func TestAdminAPI(t *testing.T) {
 	}
 
 	// 8) 凭据列表接口:发放后再查询应可见
-	if code, _ = do("POST", "/api/clientProxies", ClientProxy{
+	if code, _ = do("POST", "/api/clientProxies", starserver.ClientProxy{
 		ClientProxyName: "cp-list", StreamId: "s-list", KeyPassword: "pwd-list",
 	}, "secret"); code != http.StatusOK {
 		t.Fatalf("add clientProxy for list = %d", code)
@@ -223,7 +224,7 @@ func TestAdminAPI(t *testing.T) {
 			t.Fatalf("clientProxies response missing %s: %s", key, body)
 		}
 	}
-	var cps []ClientProxy
+	var cps []starserver.ClientProxy
 	if err := json.Unmarshal([]byte(body), &cps); err != nil {
 		t.Fatalf("decode clientProxies: %v", err)
 	}

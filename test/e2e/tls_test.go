@@ -1,4 +1,4 @@
-package starserver
+package e2e
 
 import (
 	"crypto/ecdsa"
@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"rain-net/internal/star/starserver"
 	"rain-net/protocol/star"
 )
 
@@ -61,15 +62,15 @@ func genSelfSignedCert(t *testing.T) (certFile, keyFile string) {
 func TestCtrlTLS(t *testing.T) {
 	certFile, keyFile := genSelfSignedCert(t)
 
-	hub := NewCtrlHub()
-	ctrl := NewCtrlProxyServer("svc", &ListenerList{
+	hub := starserver.NewCtrlHub()
+	ctrl := starserver.NewCtrlProxyServer("svc", &starserver.ListenerList{
 		Type:      "ctrlproxy",
 		Transport: "tcp",
-		Settings: Settings{
+		Settings: starserver.Settings{
 			TLS:      true,
 			CertFile: certFile,
 			KeyFile:  keyFile,
-			ClientProxy: []ClientProxy{
+			ClientProxy: []starserver.ClientProxy{
 				{ClientProxyName: "clientProxy-0", KeyPassword: "pwd-0"},
 			},
 		},

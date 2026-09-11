@@ -341,6 +341,8 @@ DNS 示例走查:`ingress(udp/tcp transport) + dns handler`;查询在 handler �
 
 ## 八、重构执行顺序(与 roadmap 合并)
 
+> 本节任务已展开为独立任务文件(含步骤与验收标准),执行时以 `docs/task/README.md` 为准。
+
 1. **R0 安全网先行**:e2e 测试迁到 test/e2e 并保证全绿(重构期间唯一验收标准);
 2. **R1 = M1**:pkg/rainnet + internal/transport(tcp/tls)+ register 查表化;修 plugin/forward、zplugin 编译错误;交付 test/conformance 一致性套件(细则见 §九.1);
 3. **R2**:router(现 connecttable 迁移)+ bridge 占位 + 半关闭传播契约实现;
@@ -359,3 +361,11 @@ DNS 示例走查:`ingress(udp/tcp transport) + dns handler`;查询在 handler �
 4. **可观测性最小集**:Meta 增加 `ID` 字段(进程内原子计数),日志贯穿 ingress→handler→router→dialer→bridge 同一连接 ID;错误分三类(网络错/协议错/策略拒绝)为 metrics 留维度;
 5. **Router 匹配优先级**:按配置声明顺序匹配、首中即停,不做最长匹配——可预测且与 admin API 动态增删的顺序语义一致。归 R2 定案;
 6. **安全与资源默认值**:示例配置 ingress 显式声明绑定地址(不用 0.0.0.0 兜底);基础 Conn 装饰器清单定为:限速、记账、admission(单 ingress 连接数上限、单 identity 速率上限)。
+
+## 十、决策记录(2026-09-11)
+
+1. **Go module 路径**改为 `github.com/haisentree/rain-net`:pkg/ 将被第三方插件导入,module path 即导入契约,公开仓库后再改会全量破坏导入;R1 动工时全局替换;
+2. **旧配置 schema 不兼容**:R3 起 config 包仅识别新 schema,检测到旧字段(listenerList/dailerList 等)即报错并输出新旧字段对照提示——零兼容代码,不做自动转换也不做迁移工具;
+3. **实验代码删除**:R3 清理 `cmd/` 下 mp、net-test、net2、etcd、problem、test、trans、custom,git 历史保留可找回,`cmd/` 只留 raind/rainc;
+4. **传输执行顺序定为 ws → h2 → quic**:由浅入深,R5 的连接池接口供 R6 复用,R4 的半关闭降级对照 R6 的原生支持;
+5. **CI**:R1 顺手添加 GitHub Actions(`go vet` + `go test ./...`),重构期间每次合入自动执行安全网。
