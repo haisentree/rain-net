@@ -361,3 +361,45 @@ func TestFullFlowOverTCP(t *testing.T) {
 		t.Fatal("timeout waiting server result")
 	}
 }
+
+// TestMessageFlags reserved 标志位编解码:半关/全关 streamClose 必须可区分
+func TestMessageFlags(t *testing.T) {
+	var buf bytes.Buffer
+
+	// 全关(历史语义,reserved=0)
+	full := &Message{Type: MsgStreamClose, StreamID: 7}
+	if err := WriteMessage(&buf, full); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadMessage(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Type != MsgStreamClose || got.Flags&FlagHalfClose != 0 || got.IsHalfClose() {
+		t.Fatalf("full close decoded = %+v, want plain streamClose", got)
+	}
+
+	// 半关(FlagHalfClose 置位)
+	if err := WriteMessage(&buf, HalfClose(9)); err != nil {
+		t.Fatal(err)
+	}
+	got, err = ReadMessage(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.IsHalfClose() || got.StreamID != 9 {
+		t.Fatalf("half close decoded = %+v, want half close stream 9", got)
+	}
+
+	// 未知标志位透明保留(接收方自行决定如何处理)
+	if err := WriteMessage(&buf, &Message{Type: MsgData, Flags: 0x80, StreamID: 1, Payload: []byte("x")}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = ReadMessage(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Flags != 0x80 {
+		t.Fatalf("unknown flag lost: %+v", got)
+	}
+}

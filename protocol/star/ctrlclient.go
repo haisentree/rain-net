@@ -25,8 +25,8 @@ type CtrlClient struct {
 	sess *Session
 
 	mu        sync.RWMutex
-	streams   map[string]uint32 // 配置里的字符串 streamId -> 服务端分配的数字流ID
-	streamIDs map[uint32]string // 数字流ID -> 字符串 streamId
+	streams   map[string]uint32   // 配置里的字符串 streamId -> 服务端分配的数字流ID
+	streamIDs map[uint32]string   // 数字流ID -> 字符串 streamId
 	conns     map[uint32]net.Conn // 连接ID -> 内网服务连接
 
 	// LocalDialer 服务端请求建立连接时,按 streamId 拨号内网服务
