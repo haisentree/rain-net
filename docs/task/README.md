@@ -22,7 +22,7 @@
 | R4 | [R4-ws-transport.md](R4-ws-transport.md) | websocket transport(=M2) | R1 | **done**(2026-09-11) |
 | R5 | [R5-h2-transport.md](R5-h2-transport.md) | http2 h2c transport(=M3) | R1 | pending |
 | R6 | [R6-quic-transport.md](R6-quic-transport.md) | QUIC transport(=M4) | R1 | pending |
-| R7 | [R7-bridge-conversion.md](R7-bridge-conversion.md) | 传输转换矩阵全量 + 嗅探 ingress(=M5) | R2,R4–R6 | **in-progress**(矩阵+sniff+节点串联+场景C网关已合入;剩单端口 e2e) |
+| R7 | [R7-bridge-conversion.md](R7-bridge-conversion.md) | 传输转换矩阵全量 + 嗅探 ingress(=M5) | R2,R4–R6 | **done**(2026-09-11) |
 | R8 | [R8-productization.md](R8-productization.md) | 流控/热更新/ConfigStore/DNS 迁移/可观测(=M6) | R3,R7 | pending |
 | R9 | [R9-kcp-optional.md](R9-kcp-optional.md) | kcp transport(加餐,=M7) | R1 | pending |
 
