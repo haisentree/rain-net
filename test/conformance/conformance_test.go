@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"errors"
 	"hash/crc32"
 	"io"
 	"net"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,14 +22,74 @@ import (
 
 const dialTimeout = 5 * time.Second
 
-// runSuite 对一个 Transport 实现跑全部一致性场景。
+// Caps 传输能力声明:场景按能力断言(半关闭矩阵的机器保障)。
+type Caps struct {
+	HalfClose bool // 支持 CloseWrite(不支持者走降级场景)
+}
+
+// runSuite 对一个 Transport 实现跑全部一致性场景(默认支持半关闭)。
 func runSuite(t *testing.T, name string, tr transport.Transport) {
+	runSuiteCaps(t, name, tr, Caps{HalfClose: true})
+}
+
+func runSuiteCaps(t *testing.T, name string, tr transport.Transport, caps Caps) {
 	t.Run(name+"/echo", func(t *testing.T) { scenarioEcho(t, tr) })
 	t.Run(name+"/largeTransfer", func(t *testing.T) { scenarioLargeTransfer(t, tr) })
-	t.Run(name+"/halfClose", func(t *testing.T) { scenarioHalfClose(t, tr) })
+	if caps.HalfClose {
+		t.Run(name+"/halfClose", func(t *testing.T) { scenarioHalfClose(t, tr) })
+	} else {
+		t.Run(name+"/halfCloseDegraded", func(t *testing.T) { scenarioHalfCloseDegraded(t, tr) })
+	}
 	t.Run(name+"/concurrent", func(t *testing.T) { scenarioConcurrent(t, tr) })
 	t.Run(name+"/deadline", func(t *testing.T) { scenarioDeadline(t, tr) })
 	t.Run(name+"/contextCancel", func(t *testing.T) { scenarioContextCancel(t, tr) })
+}
+
+// scenarioHalfCloseDegraded 无半关闭能力的传输(如 ws)降级语义:
+// 客户端写完整条关闭;服务端必须完整收到请求(帧序与完整性不因降级丢失),
+// 客户端随后读到关闭。
+func scenarioHalfCloseDegraded(t *testing.T, tr transport.Transport) {
+	type received struct {
+		mu   sync.Mutex
+		data []byte
+	}
+	rec := &received{}
+	addr := serve(t, tr, func(c net.Conn) {
+		buf := make([]byte, 7)
+		if _, err := io.ReadFull(c, buf); err != nil {
+			t.Errorf("server read: %v", err)
+			return
+		}
+		rec.mu.Lock()
+		rec.data = append(rec.data, buf...)
+		rec.mu.Unlock()
+		c.Close()
+	})
+
+	c := rainnet.Wrap(dial(t, tr, addr), rainnet.Meta{})
+	if _, err := c.Write([]byte("request")); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	// 本地关闭后 Read 返回 EOF 或 net.ErrClosed(含包装)均为合法(Go 惯例)
+	if _, err := c.Read(make([]byte, 1)); err != io.EOF && !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("read after close = %v, want EOF or ErrClosed", err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		rec.mu.Lock()
+		got := string(rec.data)
+		rec.mu.Unlock()
+		if got == "request" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server received %q, want %q", got, "request")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // serve 启动一个基于 tr 的测试服务,每个连接交给 handler 处理,返回服务地址。

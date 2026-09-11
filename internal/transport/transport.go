@@ -20,6 +20,7 @@ type Options struct {
 	CertFile      string // TLS 证书
 	KeyFile       string // TLS 私钥
 	TLSSkipVerify bool   // 出站跳过证书校验(自签名场景)
+	Path          string // ws 等基于 HTTP 的传输:握手路径(默认 "/")
 }
 
 // Transport 是传输层唯一接口。

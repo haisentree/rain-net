@@ -19,7 +19,7 @@ import (
 	_ "github.com/haisentree/rain-net/internal/transport/tls"
 )
 
-func genCert(t *testing.T) (certFile, keyFile string) {
+func genCert(t testing.TB) (certFile, keyFile string) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
