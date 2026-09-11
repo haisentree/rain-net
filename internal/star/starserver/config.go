@@ -34,6 +34,10 @@ type Config struct {
 	// Routes 由新 schema routes 按 dialer 展开而来的 connect 规则(非 YAML 字段)
 	Routes []ConnectItem
 
+	// ChainRoutes 出站链路路由(role: outbound 的 star dialer,非 YAML 字段)
+	ChainRoutes []ChainRoute
+	DialerSpecs map[string]config.DialerSpec
+
 	Plugin      []plugin.Plugin
 	PluginChain plugin.Handler
 	Registry    map[string]plugin.Handler
@@ -73,6 +77,14 @@ func (c *Config) Handlers() []plugin.Handler {
 		}
 	}
 	return hs
+}
+
+// ChainRoute 出站链路路由:proxy 名 → 链路拨号器(内嵌客户端拨向远端节点)
+type ChainRoute struct {
+	ProxyName string // 匹配的 ingress 名
+	Dialer    string // dialers[] 名称
+	Identity  string // 远端凭据身份
+	StreamId  string // 远端流
 }
 
 func keyForConfig(blocIndex string, blocKeyIndex string) string {

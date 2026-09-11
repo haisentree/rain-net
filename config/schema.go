@@ -62,15 +62,22 @@ type HandlerSpec struct {
 	Plugins []string `yaml:"plugins"`
 }
 
-// DialerSpec 出站定义:direct(直连)或 star(隧道)。
+// DialerSpec 拨号器定义:direct(直连)或 star(隧道)。
+//
+// role 决定运行位置:
+//   - inbound(默认):远端节点运行 rainc 拨入本节点——routes.to 匹配该身份时
+//     流量经隧道送到对端内网(经典内网穿透语义);
+//   - outbound:本节点内嵌客户端链出——routes.to 匹配时,本节点把连接
+//     经隧道推给远端节点落地(design.md §六 场景 C 节点串联)。
 type DialerSpec struct {
 	Name        string      `yaml:"name"`
-	Type        string      `yaml:"type"` // direct|star
+	Type        string      `yaml:"type"`           // direct|star
+	Role        string      `yaml:"role,omitempty"` // inbound(默认)|outbound
 	Transport   string      `yaml:"transport,omitempty"`
 	Addr        string      `yaml:"addr,omitempty"`
 	Identity    string      `yaml:"identity,omitempty"`    // star:客户端身份(clientProxyName)
 	KeyPassword string      `yaml:"keyPassword,omitempty"` // star:接入凭据
-	Locals      []LocalSpec `yaml:"locals,omitempty"`      // star:stream → 本地内网服务地址
+	Locals      []LocalSpec `yaml:"locals,omitempty"`      // inbound+rainc:stream → 本地内网服务地址
 }
 
 // LocalSpec rainc 侧 stream 到本地服务的映射。
@@ -152,8 +159,16 @@ func (r *Root) validate() error {
 		if d.Type != "direct" && d.Type != "star" {
 			return fmt.Errorf("config: dialer %s.type 必须为 direct 或 star", d.Name)
 		}
-		if d.Type == "star" && (d.Addr == "" || d.Identity == "" || d.KeyPassword == "") {
-			return fmt.Errorf("config: star dialer %s 需要 addr/identity/keyPassword", d.Name)
+		if d.Type == "star" {
+			if d.Role == "" {
+				d.Role = "inbound"
+			}
+			if d.Role != "inbound" && d.Role != "outbound" {
+				return fmt.Errorf("config: dialer %s.role 必须为 inbound 或 outbound", d.Name)
+			}
+			if d.Addr == "" || d.Identity == "" || d.KeyPassword == "" {
+				return fmt.Errorf("config: star dialer %s 需要 addr/identity/keyPassword", d.Name)
+			}
 		}
 		if names["dialer:"+d.Name] {
 			return fmt.Errorf("config: dialer %q 重名", d.Name)

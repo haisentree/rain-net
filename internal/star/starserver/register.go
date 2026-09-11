@@ -66,6 +66,10 @@ func buildRuntimeConfig(root *config.Root) *Config {
 		ListenerMap: make(map[string]*ListenerList),
 		HandlerMap:  make(map[string]HandlerList),
 		DailerMap:   make(map[string]DailerList),
+		DialerSpecs: make(map[string]config.DialerSpec),
+	}
+	for _, d := range root.Dialers {
+		cfg.DialerSpecs[d.Name] = d
 	}
 
 	for _, h := range root.Handlers {
@@ -126,11 +130,26 @@ func buildRuntimeConfig(root *config.Root) *Config {
 		cfg.Service = append(cfg.Service, s)
 	}
 
-	// routes 按拨号器定义展开为 connect 规则(星型拨号器:to → identity)
+	// routes 按 dialer 角色分流:
+	//   inbound dialer → connect 规则(远端 rainc 拨入,经典隧道);
+	//   outbound dialer → 出站链路路由(本节点内嵌客户端链出,场景 C)
 	for _, rt := range root.Routes {
 		d, ok := dialerByName[rt.To]
-		if !ok || d.Type != "star" {
-			continue // direct 出站接入在 4e dialer/star 落地后统一
+		if !ok {
+			continue
+		}
+		if d.Type == "star" && d.Role == "outbound" {
+			streams := rt.Streams
+			if len(streams) == 0 {
+				streams = []string{""}
+			}
+			for _, stream := range streams {
+				cfg.ChainRoutes = append(cfg.ChainRoutes, ChainRoute{
+					ProxyName: rt.Ingress, Dialer: d.Name,
+					Identity: d.Identity, StreamId: stream,
+				})
+			}
+			continue
 		}
 		if len(rt.Streams) == 0 {
 			cfg.Routes = append(cfg.Routes, ConnectItem{
@@ -245,8 +264,25 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 				servers = append(servers, c)
 				continue
 			case "proxy":
-				// bridger 暂未实现,同进程内通过 hub 直连
-				p, err := NewProxyServer(srv.Name, listener, connectTable, hub)
+				// bridger 暂未实现,同进程内通过 hub 直连;
+				// 出站链路(场景 C)路由经选项注入(内嵌客户端拨向远端节点)
+				var chainRoutes []ChainRoute
+				for _, cr := range h.Configs.ChainRoutes {
+					if cr.ProxyName == listener.Name {
+						chainRoutes = append(chainRoutes, cr)
+					}
+				}
+				var popts []ProxyOption
+				if len(chainRoutes) > 0 {
+					specs := make(map[string]config.DialerSpec, len(chainRoutes))
+					for _, cr := range chainRoutes {
+						if spec, ok := h.Configs.DialerSpecs[cr.Dialer]; ok {
+							specs[cr.Dialer] = spec
+						}
+					}
+					popts = append(popts, WithChainRoutes(chainRoutes, specs))
+				}
+				p, err := NewProxyServer(srv.Name, listener, connectTable, hub, popts...)
 				if err != nil {
 					slog.Warn("proxy NewServer", "err", err)
 					continue
@@ -295,4 +331,13 @@ func (s *starContext) makeBridgers() (err error) {
 
 func (s *starContext) makeDailers() (err error) {
 	return nil
+}
+
+// BuildServersFromRoot 从新 schema 构建全部服务组件(测试与装配层入口)。
+func BuildServersFromRoot(root *config.Root) ([]pluginer.Server, error) {
+	ctx := &starContext{
+		Configs:       buildRuntimeConfig(root),
+		ZoneToConfigs: make(map[string]*Config),
+	}
+	return ctx.MakeServers()
 }
