@@ -1,6 +1,6 @@
 # R3:star 拆解 + 新配置 schema + admin 聚合
 
-- 状态:in-progress(切片1-3 + 切片4a-4c 均已合入 main,2026-09-11)
+- 状态:in-progress(切片1-3 + 4a-4d 均已合入 main,2026-09-11;剩 4e)
 - 依赖:R2
 - 关联:`docs/design.md` §三(命名与目标 schema)、§五(迁移映射)、§九.2(半关帧);`docs/research/gost.md`;`docs/star-protocol.md`
 
@@ -40,4 +40,4 @@
 
 ## 进度日志
 
-- 2026-09-11:切片2(隧道端到端半关闭)合入——CtrlClient 半关感知(半关帧→内网连接 CloseWrite、内网 EOF→半关帧),ProxyServer 生命周期重构为双方向独立收尾(与 R2 Bridge 同构);新增 e2e TestProxyHalfCloseEndToEnd(EOF 反应式后端穿透隧道)。切片3(StreamConn/StreamHub 适配器)合入——protocol/star/adapter.go,五场景测试。- 2026-09-11:切片4a-4c 合入——4a 配置模型类型抽至 config/ 包(starserver 别名引用,零改动);4b 二进制定名 cmd/raind + cmd/rainc,删除 cmd/{etcd,problem,custom};4c ctrl 三件套(ctrl_hub/streamtable/ctrlproxy)+ ctrl_proxy_test 迁入 internal/handler/star(包名 starhandler),ConnEntry 字段导出(Sink/Done/RemoteClosed/Stream)供 proxy 跨包使用,listenTCP 等价迁移。**下一步:切片4d = 新 schema(ingress/dialers/routes,§十.2 旧 schema 报错)+ admin APIProvider 聚合(/api/tunnel/*);切片4e = proxy/admin 迁入 handler 域收口 ConnEntry、dialer/star(基于 StreamHub)、internal/client(NewDialer 迁移)。**切片1 记录:——reserved 标志位 FlagHalfClose 区分 streamClose 半关/全关,IsHalfClose()/HalfClose(streamID) 辅助,旧对端降级兼容;协议测试覆盖全关/半关/未知标志透传;star-protocol.md 已同步。**下一步:切片2 = starStreamAdapter(用 CloseWrite→半关帧)+ conformance 增补 star 场景,然后按本文件交付物顺序推进拆包/schema/admin。**
+- 2026-09-11:切片2(隧道端到端半关闭)合入——CtrlClient 半关感知(半关帧→内网连接 CloseWrite、内网 EOF→半关帧),ProxyServer 生命周期重构为双方向独立收尾(与 R2 Bridge 同构);新增 e2e TestProxyHalfCloseEndToEnd(EOF 反应式后端穿透隧道)。切片3(StreamConn/StreamHub 适配器)合入——protocol/star/adapter.go,五场景测试。- 2026-09-11:切片4a-4c 合入——4a 配置模型类型抽至 config/ 包(starserver 别名引用,零改动);4b 二进制定名 cmd/raind + cmd/rainc,删除 cmd/{etcd,problem,custom};4c ctrl 三件套(ctrl_hub/streamtable/ctrlproxy)+ ctrl_proxy_test 迁入 internal/handler/star(包名 starhandler),ConnEntry 字段导出(Sink/Done/RemoteClosed/Stream)供 proxy 跨包使用,listenTCP 等价迁移。- 2026-09-11:切片4d 合入——config/schema.go 新 schema(Root/ServiceSpec/IngressSpec/HandlerSpec/DialerSpec/RouteSpec + Load 校验),旧 schema 字段检测即报错附迁移对照(§十.2);starserver newContext 重写为 config.Load → buildRuntimeConfig 映射(handler star→ctrlproxy、admin→admin、空→proxy、其余→插件链;routes 按 dialer 展开为 connect);etc/star.example.yaml 与 rainc 重写为新 schema(rainc 支持 dialers[].locals 本地映射);**internal/client(NewDialer)提前完成迁移**。**下一步:切片4e = admin APIProvider 聚合(/api/tunnel/*)+ proxy/admin 迁入 handler 域收口 ConnEntry + dialer/star(基于 StreamHub/OpenStream)。**切片1 记录:——reserved 标志位 FlagHalfClose 区分 streamClose 半关/全关,IsHalfClose()/HalfClose(streamID) 辅助,旧对端降级兼容;协议测试覆盖全关/半关/未知标志透传;star-protocol.md 已同步。**下一步:切片2 = starStreamAdapter(用 CloseWrite→半关帧)+ conformance 增补 star 场景,然后按本文件交付物顺序推进拆包/schema/admin。**
