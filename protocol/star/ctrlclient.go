@@ -308,9 +308,14 @@ func (c *CtrlClient) handleConnOpen(msg *Message) {
 	c.connsQ[req.ConnID] = q
 	c.mu.Unlock()
 
-	// 写泵:窗口额度归还也在此(消费 32KB 归还一次)
+	// 写泵:窗口额度归还也在此(消费 32KB 归还一次);nil 哨兵 = 排空后 CloseWrite
 	go func() {
+		rc := rainnet.Wrap(conn, rainnet.Meta{})
 		for payload := range q {
+			if payload == nil {
+				_ = rc.CloseWrite() // 不支持半关闭的本地连接:静默降级
+				continue
+			}
 			if _, err := conn.Write(payload); err != nil {
 				c.closeConn(req.ConnID, true)
 				return
@@ -364,17 +369,16 @@ func (c *CtrlClient) pumpUplink(connID uint32, conn rainnet.Conn) {
 }
 
 // halfCloseConn 服务端半关闭:内网连接写侧关闭,连接保留
+// halfCloseConn 服务端半关闭:经写泵队列投递 nil 哨兵——
+// 先刷出队列中的数据,再 CloseWrite 内网连接(顺序保证,防请求数据丢失)。
 func (c *CtrlClient) halfCloseConn(connID uint32) {
 	c.mu.RLock()
-	conn := c.conns[connID]
+	q := c.connsQ[connID]
 	c.mu.RUnlock()
-	if conn == nil {
-		slog.Warn("DBG halfClose: conn not found", "conn", connID)
+	if q == nil {
 		return
 	}
-	slog.Warn("DBG halfClose: closing intranet write side", "conn", connID)
-	// 本地连接不支持半关闭时无法通知内网,保持现状(降级)
-	_ = conn.CloseWrite()
+	q <- nil // nil 哨兵:写泵排空队列后 CloseWrite
 }
 
 // closeConn 关闭并移除一条连接,notify 为 true 时通知服务端
