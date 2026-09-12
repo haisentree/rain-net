@@ -42,6 +42,9 @@
   downDone+bothFinished→teardown→mc.Close → 应答帧随后到达被丢弃。
 - 已做:下行泵 RemoteClosed 处理后**不退出**(rc 置 nil),CloseWrite 后继续
   转发 Sink 帧,生命周期与 R2 Bridge 状态机对齐;宽限 100ms。
-- 待根治方向:① 排空完成条件从"静默计时"改为"客户端全关帧到达"(协议已有
-  全关语义,服务端读循环转发即可);② 或 HalfClose 帧携带后端连接状态避免推断。
-- 半关闭语义回归:TestNodeChainDialIntranet(串联路径)持续覆盖。
+- ✅ **已根治(2026-09-12)**:真根因是客户端 Run 收到半关帧时**立即 CloseWrite 内网连接**,
+  而写泵队列中的请求数据尚未刷出——后端收到"空请求+FIN",应答被 EPIPE 链路丢弃
+  (此前两轮修复均为时序缓解,未触及此根因)。
+- 修复:halfCloseConn 经 connsQ 投递 **nil 哨兵**,写泵排空队列数据后 CloseWrite,
+  顺序由队列保证;proxy 侧静默排空 + CloseWrite 后存活转发配合;20 轮压力全过,
+  TestProxyHalfCloseEndToEnd 已恢复运行(取消 Skip)。star 协议文档帧表(0x22/0x30/0x31)同步待办。
