@@ -63,6 +63,10 @@ type Settings struct {
 
 	Connect     []ConnectItem `yaml:"connect,omitempty"`
 	ClientProxy []ClientProxy `yaml:"clientProxy,omitempty"`
+
+	// dns handler(R3-4e 迁移)
+	DNSZones     map[string]map[string]string `yaml:"dnsZones,omitempty"`
+	DNSUpstreams []string                     `yaml:"dnsUpstreams,omitempty"`
 }
 
 // ConnectItem connect 路由规则

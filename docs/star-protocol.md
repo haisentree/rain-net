@@ -175,6 +175,7 @@ case star.MsgRegisterStream:
 
 | 值 | 名称 | 方向 | 负载 |
 |-----|------|------|------|
+| 0x22 | windowUpdate | 双向 | JSON `WindowUpdate`(R8 流控) |
 | 0x30 | clientConnReq | 客户端 → 服务端 | JSON `ClientConnReq` |
 | 0x31 | clientConnAck | 服务端 → 客户端 | JSON `ClientConnAck` |
 
