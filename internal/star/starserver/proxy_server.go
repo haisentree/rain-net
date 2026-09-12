@@ -266,7 +266,10 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 				}
 				e.ReleaseRecv(len(payload)) // 归还客户端发送额度(流控)
 			case <-rc:
-				// 后端写完:排空在途 → 对外部 CloseWrite(EOF)→ downDone
+				// 后端写完(半关帧):静默检测排空——
+				// 后端应答穿越"客户端↔服务端"往返需要额外时间,
+				// 50ms 无新数据才认定流结束,随后对外部 CloseWrite(EOF)
+				quiet := false
 				for {
 					select {
 					case payload := <-e.Sink:
@@ -275,16 +278,24 @@ func (s *ProxyServer) handleConn(conn net.Conn) {
 							return
 						}
 						e.ReleaseRecv(len(payload))
-					default:
-						downDone.Store(true)
-						// 支持半关闭则只关外部写侧;泵继续存活——
-						// 后端应答可能仍在"客户端往返"路上,迟到的下行帧照常转发;
-						// 整条拆除交给上行结束(外部关闭/错误)或 e.Done
-						if cw, ok := mc.(interface{ CloseWrite() error }); ok {
-							_ = cw.CloseWrite()
+						quiet = false
+					case <-time.After(50 * time.Millisecond):
+						if quiet {
+							// 连续两轮静默:后端流结束 → 对外部 CloseWrite
+							downDone.Store(true)
+							if cw, ok := mc.(interface{ CloseWrite() error }); ok {
+								_ = cw.CloseWrite()
+							}
+							bothFinished()
+							rc = nil // 已处理;泵继续存活(外部→客户端上行不受影响)
+						} else {
+							quiet = true // 首次静默:再确认一轮
 						}
-						bothFinished()
-						rc = nil
+					case <-e.Done:
+						teardown("hub conn closed")
+						return
+					case <-done:
+						return
 					}
 				}
 			case <-e.Done:
