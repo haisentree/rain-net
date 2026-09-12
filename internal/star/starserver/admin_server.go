@@ -43,6 +43,7 @@ type AdminServer struct {
 	hub      *starhandler.CtrlHub
 	connects *ConnectTable
 	ctrls    []*starhandler.CtrlProxyServer
+	apis     []pluginer.APIProvider
 
 	started time.Time
 
@@ -51,7 +52,7 @@ type AdminServer struct {
 
 var _ pluginer.Server = (*AdminServer)(nil)
 
-func NewAdminServer(name string, listener *ListenerList, hub *starhandler.CtrlHub, connects *ConnectTable, ctrls []*starhandler.CtrlProxyServer) *AdminServer {
+func NewAdminServer(name string, listener *ListenerList, hub *starhandler.CtrlHub, connects *ConnectTable, ctrls []*starhandler.CtrlProxyServer, apis ...pluginer.APIProvider) *AdminServer {
 	return &AdminServer{
 		Name: name,
 		Net:  listener.Transport,
@@ -61,6 +62,7 @@ func NewAdminServer(name string, listener *ListenerList, hub *starhandler.CtrlHu
 		hub:      hub,
 		connects: connects,
 		ctrls:    ctrls,
+		apis:     apis,
 		started:  time.Now(),
 	}
 }
@@ -101,6 +103,10 @@ func (s *AdminServer) Serve(l net.Listener) error {
 		if ap, ok := any(c).(pluginer.APIProvider); ok {
 			ap.RegisterAPI(apiMux)
 		}
+	}
+	for _, ap := range s.apis {
+		println("ADMIN AGGREGATE:", len(s.apis))
+		ap.RegisterAPI(apiMux)
 	}
 
 	// 内嵌 Web 管理台:静态资源公开(页面无敏感数据),

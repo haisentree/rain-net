@@ -47,6 +47,10 @@ type IngressExtra struct {
 
 	CertFile string `yaml:"certFile,omitempty"`
 	KeyFile  string `yaml:"keyFile,omitempty"`
+
+	// dns handler:zone 表(zone → 主机 → A 记录 IP)与上游
+	DNSZones     map[string]map[string]string `yaml:"dnsZones,omitempty"`
+	DNSUpstreams []string                     `yaml:"dnsUpstreams,omitempty"`
 }
 
 // Credential star 隧道客户端凭据:一个身份可注册多个流。

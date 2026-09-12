@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/haisentree/rain-net/config"
+	"github.com/haisentree/rain-net/internal/handler/dns"
 	starhandler "github.com/haisentree/rain-net/internal/handler/star"
 	"github.com/haisentree/rain-net/internal/transport"
 	"github.com/haisentree/rain-net/pluginer"
@@ -100,6 +101,8 @@ func buildRuntimeConfig(root *config.Root) *Config {
 					KeyFile:       ing.Settings.KeyFile,
 					Target:        ing.Settings.Target,
 					InCodec:       ing.Settings.InCodec,
+					DNSZones:      ing.Settings.DNSZones,
+					DNSUpstreams:  ing.Settings.DNSUpstreams,
 				},
 			}
 			switch ing.Handler {
@@ -116,6 +119,8 @@ func buildRuntimeConfig(root *config.Root) *Config {
 				}
 			case "admin":
 				ll.Type = "admin"
+			case "dns":
+				ll.Type = "dns"
 			case "":
 				// 空处理器 = 连接泵代理,路由按 ingress 名匹配
 				ll.Type = "proxy"
@@ -245,6 +250,7 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 	connectTable.Seed(h.Configs.Routes)
 
 	var ctrls []*starhandler.CtrlProxyServer
+	var apis []pluginer.APIProvider
 	var adminListeners []*ListenerList
 
 	for _, srv := range srvList {
@@ -293,6 +299,12 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 				// admin 放到循环结束后创建,以引用组内全部 ctrlproxy
 				adminListeners = append(adminListeners, listener)
 				continue
+			case "dns":
+				println("MAKE: dns case hit")
+				dh := dns.New(listener.Name, listener.Settings.DNSZones, listener.Settings.DNSUpstreams)
+				servers = append(servers, dh)
+				apis = append(apis, dh)
+				continue
 			}
 
 			// udp 走 PacketConn 特例(ListenPacket),transport 层 v1 不建模 UDP 数据报;
@@ -316,7 +328,7 @@ func (h *starContext) makeServersForGroup(srvList []Service) ([]pluginer.Server,
 	}
 
 	for _, l := range adminListeners {
-		servers = append(servers, NewAdminServer(l.Name, l, hub, connectTable, ctrls))
+		servers = append(servers, NewAdminServer(l.Name, l, hub, connectTable, ctrls, apis...))
 	}
 	return servers, nil
 }
