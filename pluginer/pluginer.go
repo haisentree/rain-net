@@ -23,7 +23,7 @@ var (
 )
 
 func Start(yamlfile Input) (*Instance, error) {
-	inst := &Instance{serverType: yamlfile.ServerType(), wg: new(sync.WaitGroup)}
+	inst := &Instance{serverType: yamlfile.ServerType(), input: yamlfile, wg: new(sync.WaitGroup)}
 	if err := ValidateAndExecuteDirectives(yamlfile, inst); err != nil {
 		return nil, err
 	}

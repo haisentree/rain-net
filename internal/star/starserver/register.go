@@ -43,7 +43,7 @@ func newDefaultInput() pluginer.Input {
 //   - 其他 handler 名             → 插件链帧服务(handlers[] 定义插件序列)
 //   - routes 按拨号器定义展开为 connect 规则(星型拨号器:to→identity)
 func newContext(i *pluginer.Instance) pluginer.Context {
-	data, err := os.ReadFile(newDefaultInput().Path())
+	data, err := os.ReadFile(i.Input().Path())
 	if err != nil {
 		panic(err)
 	}
