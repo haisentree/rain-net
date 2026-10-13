@@ -1,6 +1,6 @@
 # R6:QUIC transport(= roadmap M4)
 
-- 状态:pending
+- 状态:**done**(2026-09-11,commit 28cac92)
 - 依赖:R5(复用其连接池接口;顺序已定,见 design.md §十.4)
 - 关联:`docs/references.md`(Reverst、hysteria、cloudflared)、`docs/design.md` §二
 
@@ -23,10 +23,10 @@
 
 ## 验收标准
 
-- [ ] conformance 六场景通过;
-- [ ] 与 Reverst 对照的连接管理(超时/重连/池)有明确取舍记录;
-- [ ] 压测 + 总结文档齐备。
+- [x] conformance 六场景通过——test/conformance/quic_test.go;
+- [x] 与 Reverst 对照的连接管理(超时/重连/池)有明确取舍记录;
+- [x] 压测 + 总结文档齐备——docs/research/quic-transport.md。
 
 ## 进度日志
 
-- (无)
+- 2026-09-11:合入 28cac92(internal/transport/quic,quic-go;按 (网络,地址) 池化复用 quic.Connection,与 h2 池形态同构;CancelRead/Close 原生半关闭对齐);conformance quic_test.go 覆盖;总结文档 docs/research/quic-transport.md。2026-10-09 补记状态(账实核对)。

@@ -1,6 +1,6 @@
 # R4:websocket transport(= roadmap M2)
 
-- 状态:pending
+- 状态:**done**(2026-09-11,commit 588f3b1)
 - 依赖:R1(conformance 套件)
 - 关联:`docs/references.md`(B 类:chisel、wstunnel)、`docs/design.md` §二 半关闭矩阵、`protocol/ws/`(现有基础)
 
@@ -24,10 +24,10 @@
 
 ## 验收标准
 
-- [ ] conformance 六场景通过(半关闭按降级语义);
-- [ ] 压测数据 + 总结文档产出;
-- [ ] design.md 半关闭矩阵 ws 行与实现一致。
+- [x] conformance 六场景通过(半关闭按降级语义)——test/conformance/ws_test.go;
+- [x] 压测数据 + 总结文档产出——docs/research/ws-transport.md;
+- [x] design.md 半关闭矩阵 ws 行与实现一致。
 
 ## 进度日志
 
-- (无)
+- 2026-09-11:合入 588f3b1(internal/transport/ws);conformance 套件 ws_test.go 覆盖;总结文档 docs/research/ws-transport.md;design.md 半关闭矩阵 ws 行为降级契约。2026-10-09 补记状态(账实核对)。

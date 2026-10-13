@@ -1,6 +1,6 @@
 # R5:http2 h2c transport(= roadmap M3)
 
-- 状态:pending
+- 状态:**done**(2026-09-11,commit df099e4)
 - 依赖:R1
 - 关联:`docs/references.md`(sing-box v2ray-transport、Xray h2)、`docs/design.md` §二
 
@@ -24,10 +24,10 @@
 
 ## 验收标准
 
-- [ ] 多流并发场景:慢流不阻塞其他流(流级窗口生效);
-- [ ] 连接池:并发 Dial 不重复建物理连接;
-- [ ] conformance + 压测 + 总结文档齐备。
+- [x] 多流并发场景:慢流不阻塞其他流(流级窗口生效);
+- [x] 连接池:并发 Dial 不重复建物理连接(共享 http2.Client);
+- [x] conformance + 压测 + 总结文档齐备——test/conformance/h2_test.go + docs/research/h2-transport.md。
 
 ## 进度日志
 
-- (无)
+- 2026-09-11:合入 df099e4(internal/transport/h2,共享 http2.Client 池化 Dial,path/host 伪装可配,END_STREAM ↔ CloseWrite);conformance h2_test.go 覆盖;总结文档 docs/research/h2-transport.md。2026-10-09 补记状态(账实核对)。

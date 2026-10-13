@@ -1,6 +1,6 @@
 # R8:产品化收尾(= roadmap M6)
 
-- 状态:in-progress(流控 ✅ + ConfigStore/Makefile ✅ 已合入;剩热更新/DNS 迁移/可观测,2026-09-11)
+- 状态:in-progress(流控 ✅ + ConfigStore ✅ + 热更新 ✅ + DNS 垂直切片 ✅ 已合入;剩可观测性/分发收尾/EtcdStore/DNS 补全,2026-10-09 核对)
 - 依赖:R3、R7
 - 关联:`docs/design.md` §七(控制面)、§九.3(取消链);`docs/research/nps.md` §2.4(功能清单);roadmap M6
 
@@ -11,11 +11,11 @@
 ## 交付物(可拆分独立推进)
 
 1. **star 按流流控/背压** ✅(2026-09-11):Window 原语 + MsgWindowUpdate 双向流控;客户端每连接写泵消除跨流头阻塞;e2e TestFlowControlNoHOL(慢流占满窗口、快流不受影响);proxy 下行排空竞态修复(静默窗口)。**star 协议自此封盘**(协议文档帧表待同步 0x22);
-2. **配置热更新**:实例替换式重载(Caddy 路线),依赖 §九.3 取消链排空旧连接;admin API 触发;
+2. **配置热更新** ✅(2026-09-12,R8-2b):实例替换式重载(Caddy 路线)——`pluginer.Instance.Stop()`(关监听/包连接 + OnShutdown 回调 + wg 等待)+ `starserver.Reload` 先 `config.Load` 校验(坏配置保旧实例原样保留)再停旧起新;SIGHUP 触发,SIGINT/SIGTERM 优雅退出;e2e TestReload 全过;
 3. **ConfigStore** ✅(2026-09-11,部分):internal/configstore 接口 + FileStore(原子写/轮询 watch/键逃逸防护)+ 测试;EtcdStore 待配置中心落地(接口已预留);
-4. **DNS 迁移**:`internal/handler/dns` + dns ingress(udp/tcp transport);缓存命中不进 Bridge;线路匹配(地理/运营商);`/api/dns/*/zones` 外置管理;上游 dialer 化 → DoT/DoH = tls/http transport 出口;
+4. **DNS 迁移**:**垂直切片 ✅**(2026-09-12,R8-3)——`internal/handler/dns`:zone 表精确匹配 A 记录应答 + 未命中上游轮询转发 + TCP-DNS 帧循环;APIProvider 挂 `/api/dns/{name}/zones`(即时生效 + 可选 FileStore 持久化,design §七 旗舰示例)。**剩余**:线路匹配(地理/运营商)、上游 dialer 化 → DoT/DoH(tls/http transport 出口)、UDP 入站(受阻于 transport 层 v1 不建模 PacketConn,roadmap 列为远期)、handler 测试补齐(切片目前无独立测试);
 5. **可观测性**:metrics(错误三分类、每 transport 连接数/流量)、日志贯穿 ConnID、admin 大盘补充;
-6. **分发**:单二进制构建(linux/amd64/arm64 + darwin + windows)、最小 systemd 单元、文档站骨架。
+6. **分发**:**部分 ✅**(R8-1)——Makefile `dist` 交叉编译矩阵已落(linux/amd64+arm64、darwin/amd64+arm64、windows/amd64,raind+rainc 双二进制,CGO_ENABLED=0 + trimpath);**剩余**:最小 systemd 单元、文档站骨架、发布产物下载入口。
 
 ## 步骤
 
@@ -23,15 +23,17 @@
 
 ## 验收标准
 
-- [ ] 慢流场景:单条慢流不拖垮同物理连接的其他流(流控生效);
-- [ ] 热更新:重载期间已建立连接不中断,新连接走新配置;
-- [ ] 双节点:节点 A 的 DNS/路由变更经 etcd 同步到节点 B 生效;
-- [ ] DNS:records API 增删即时生效,DoH/DoT 上游可用;
-- [ ] 发布产物可一键下载运行。
+- [x] 慢流场景:单条慢流不拖垮同物理连接的其他流(流控生效)——e2e TestFlowControlNoHOL ✅;
+- [x] 热更新:重载期间已建立连接不中断,新连接走新配置——e2e TestReload(坏配置保旧实例、新配置生效新 zone)✅;
+- [ ] 双节点:节点 A 的 DNS/路由变更经 etcd 同步到节点 B 生效(EtcdStore 未实现,接口已预留);
+- [ ] DNS:records API 增删即时生效(zones API 已实现),DoH/DoT 上游可用(**未做**);
+- [ ] 发布产物可一键下载运行(dist 交叉编译产物已就绪,发布托管/下载入口未建)。
 
 ## 进度日志
 
-- (无)
+- 2026-09-11:R8-1 ConfigStore(FileStore:原子写/轮询 watch/键逃逸防护)+ Makefile dist 交叉编译矩阵;R8-2 star 每流流控(Window 原语 + MsgWindowUpdate)+ 无头阻塞 e2e,**star 协议自此封盘**;R9 kcp transport 同日合入;
+- 2026-09-12:半关闭竞态根治(半关信号经写泵队列 nil 哨兵传递,顺序由队列保证,见下遗留项);R8-2b 配置热更新(Instance.Stop + SIGHUP + Reload 校验,e2e TestReload);R8-3 DNS 迁移垂直切片(handler/dns + APIProvider)+ star 协议文档帧表(0x22/0x30/0x31)同步;
+- 2026-10-09:账实核对——交付物状态与验收框同步至实际合入进度;剩余项明确为:**可观测性(#5,未开工)、分发收尾(#6 systemd/文档站/下载入口)、EtcdStore(#3,接口已预留)、DNS 补全(#4 线路匹配/DoT·DoH 上游/UDP 入站/测试)**;四项均不依赖 R5/R6,可先行收尾闭环 M6。
 
 ## 遗留项:半关闭 e2e 竞态(2026-09-11 调查记录)
 
@@ -47,4 +49,4 @@
   (此前两轮修复均为时序缓解,未触及此根因)。
 - 修复:halfCloseConn 经 connsQ 投递 **nil 哨兵**,写泵排空队列数据后 CloseWrite,
   顺序由队列保证;proxy 侧静默排空 + CloseWrite 后存活转发配合;20 轮压力全过,
-  TestProxyHalfCloseEndToEnd 已恢复运行(取消 Skip)。star 协议文档帧表(0x22/0x30/0x31)同步待办。
+  TestProxyHalfCloseEndToEnd 已恢复运行(取消 Skip)。star 协议文档帧表(0x22/0x30/0x31)已随 R8-3 合入同步(2026-09-12)。

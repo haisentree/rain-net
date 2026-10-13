@@ -372,3 +372,4 @@ DNS 示例走查:`ingress(udp/tcp transport) + dns handler`;查询在 handler �
 3. **实验代码删除**:R3 清理 `cmd/` 下 mp、net-test、net2、etcd、problem、test、trans、custom,git 历史保留可找回,`cmd/` 只留 raind/rainc;
 4. **传输执行顺序定为 ws → h2 → quic**:由浅入深,R5 的连接池接口供 R6 复用,R4 的半关闭降级对照 R6 的原生支持;
 5. **CI**:R1 顺手添加 GitHub Actions(`go vet` + `go test ./...`),重构期间每次合入自动执行安全网。
+6. **E-track 立项(2026-10-08)**:新增学习线——用 Go 重实现 EasyTier 的组网内核(TUN/加密信道/中继/NAT 打洞/路由同步/子网代理),独立于协议转换网关主线并行推进,代码物理隔离,E4 毕业前不向主线引入依赖;阶段划分、毕业线与参照清单见 `docs/task/E-mesh-vpn.md`。`example/EasyTier` 为 LGPL-3.0 参考克隆:只读参考,不移植代码、不复用其命名与包结构;代码位置(独立 module / `internal/mesh/`)E1 开工时定案并回填本条。
