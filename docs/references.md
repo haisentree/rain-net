@@ -17,7 +17,7 @@
 | ★★☆ | chisel | M2(ws) | ws 承载任意 TCP 流的完整实现 |
 | ★★☆ | quic-go | M4(QUIC) | 直接依赖库,读法有讲究 |
 | ★★☆ | Reverst | M4(QUIC) | HTTP/3 反向隧道,Go + quic-go |
-| ★☆☆ | Xray/v2ray | M3(h2)、M7(kcp) | 传输抽象演进史、xhttp 变体 |
+| ★☆☆ | Xray/v2ray | M3(h2)、M7(kcp) | 传输抽象演进史、xhttp 变体(v2ray 已克隆已深读 → docs/research/v2ray-core.md) |
 | ★☆☆ | Caddy | M6(产品化) | 热更新、TLS 自动化 |
 | ★☆☆ | hysteria | M4(QUIC) | QUIC 代理协议 + 自定义拥塞控制 |
 | ★☆☆ | cloudflared | M4/M5 | 生产级 QUIC 隧道实践 |
@@ -42,9 +42,9 @@
 - Go。inbound / outbound / router 三层;任意代理协议 × 任意传输(tcp/ws/grpc/h2/quic/httpupgrade)正交组合——正是本项目"协议层 × 传输层"决策的成熟样板。
 - 参考:transport 接口的 `DialContext/Listener` 形状、mux 多路复用协议选择(smux/yamux/h2mux)、router 规则引擎、内置 DNS 模块。
 
-### Xray / v2ray ★☆☆
-- 仓库:[XTLS/Xray-core](https://github.com/XTLS/Xray-core)、[v2fly/v2ray-core](https://github.com/v2fly/v2ray-core)
-- Go。transport 抽象演进史(从 mkcp/ws/h2 到 xhttp):看它每个传输如何实现统一的 `internet.Transport` 接口,以及流控/伪装层叠设计。读设计文章比读代码效率更高。
+### Xray / v2ray ★☆☆(v2ray 已深读,笔记:[docs/research/v2ray-core.md](research/v2ray-core.md))
+- 仓库:[XTLS/Xray-core](https://github.com/XTLS/Xray-core)、[v2fly/v2ray-core](https://github.com/v2fly/v2ray-core)(已克隆:`third_party/v2ray-core`,v5.53.0,MIT)
+- Go。transport 抽象演进史(从 mkcp/ws/h2 到 xhttp)。**注意:v2fly v5 没有 xhttp/REALITY,也没有统一的 `internet.Transport` 接口**(那是 Xray 的演进);v5 的做法是"统一拨号签名 + 三张注册表 + StreamConfig 声明式组合",细节见调研笔记 §五。xhttp 变体需读 Xray-core。
 
 ### MOSN ★☆☆(已不活跃,读文档为主)
 - 仓库:[alibaba/mosn](https://github.com/alibaba/mosn)

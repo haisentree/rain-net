@@ -84,7 +84,8 @@ func CopyWaitGroup(conn1, conn2 net.Conn, crypt bool, snappy bool,
 | gost-x(test/example/gost-x) | `internal/net/transport.go` | 本篇已分析;再看 `bufpool` 的实现(sync.Pool 细节) |
 | nps(test/example/nps) | `lib/conn/conn.go` | 本篇已分析;对照 `lib/common/pool.go` 的 buffer 池 |
 | frp(待克隆) | `pkg/util/net/` | `Join` 的错误处理与关闭顺序 |
-| v2ray-core / sing-box(待克隆) | v2ray `common/buf/copy.go`、sing-box 的 relay 相关 | 内部管道怎么背压、关闭怎么通知 |
+| v2ray-core(third_party/v2ray-core,已克隆已分析 → docs/research/v2ray-core.md) | `common/buf/copy.go`、`transport/pipe/impl.go` | 已回答:背压全在 pipe(有界+阻塞写),copy 无状态;关闭分 Close(半关排空 EOF)/Interrupt(全断)两级,广播用 done |
+| sing-box(待克隆) | relay 相关 | 对照 v2ray 的另一份实现 |
 | Envoy(只读文档/blog) | tcp_proxy 文档 | watermark 背压机制,M6 之后再考虑 |
 | quic-go(test 时引入) | `quic.Stream` | `CancelRead` 读侧半关闭 API 形状 |
 | ssh(标准库 golang.org/x/crypto/ssh) | channel 机制 | 窗口流控下拷贝怎么写 |
